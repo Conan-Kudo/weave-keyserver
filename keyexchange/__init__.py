@@ -33,28 +33,4 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
-from distutils.command.bdist_rpm import bdist_rpm
 
-entry_points = """
-[paste.app_factory]
-main = keyexchange.wsgiapp:make_app
-
-[paste.app_install]
-main = paste.script.appinstall:Installer
-"""
-
-requires = ['WebOb', 'Paste', 'PasteScript', 'repoze.profile']
-
-class _bdist_rpm(bdist_rpm):
-    def _make_spec_file(self):
-        return open('JPakeServer.spec').read().split('\n')
-
-setup(name='KeyExchange', author='Tarek Ziade',
-      url='https://hg.mozilla.org/services/server-key-exchange',
-      description='J-Pake server',
-      long_description=open('README.txt').read(),
-      author_email='tarek@mozilla.com',
-      version=0.1, packages=find_packages(),
-      entry_points=entry_points, install_requires=requires,
-      license='MPL', cmdclass={'bdist_rpm': _bdist_rpm})

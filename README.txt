@@ -1,7 +1,8 @@
-=============
-J-PAKE Server
-=============
+===================
+Key Exchange Server
+===================
 
-Implementation of the J-PAKE server.
+Implementation of a key exchange server that can be used with protocols like
+J-PAKE.
 
 See: https://wiki.mozilla.org/Services/Sync/SyncKey/J-PAKE

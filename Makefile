@@ -1,6 +1,6 @@
 VIRTUALENV = virtualenv
 NOSE = bin/nosetests -s
-TESTS = jpake/tests
+TESTS = keyexchange/tests
 PYTHON = bin/python
 EZ = bin/easy_install
 
@@ -19,13 +19,13 @@ test:
 	$(NOSE) $(TESTS)
 
 bench_one:
-	bin/fl-run-test jpake.tests.stress StressTest.test_session -u http://localhost:5000
+	bin/fl-run-test keyexchange.tests.stress StressTest.test_session -u http://localhost:5000
 
 bench:
-	cd jpake/tests; ../../bin/fl-run-bench stress StressTest.test_session -u http://localhost:5000
+	cd keyexchange/tests; ../../bin/fl-run-bench stress StressTest.test_session -u http://localhost:5000
 
 bench_report:
-	bin/fl-build-report --html -o html jpake/tests/stress-bench.xml
+	bin/fl-build-report --html -o html keyexchange/tests/stress-bench.xml
 
 build_rpm:
 	$(PYTHON) setup.py bdist_rpm

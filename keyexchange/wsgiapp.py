@@ -53,16 +53,17 @@ except (ImportError, RuntimeError):
     try:
         from memcache import Client  # NOQA
     except ImportError:
-        from jpake.util import MemoryClient as Client  # NOQA
+        from keyexchange.util import MemoryClient as Client  # NOQA
 
-from jpake.util import generate_cid, json_response, CID_CHARS
+from keyexchange.util import generate_cid, json_response, CID_CHARS
 
 
 _URL = re.compile('/(new_channel|[a-zA-Z0-9]*)/?')
-_INC_KEY = 'jpake:channel_id'
+_CPREFIX = 'keyexchange:'
+_INC_KEY = '%schannel_id' % _CPREFIX
 
 
-class JPakeApp(object):
+class KeyExchangeApp(object):
 
     def __init__(self, cid_len, cache_servers=None, ttl=36000):
         self.cid_len = cid_len
@@ -74,10 +75,10 @@ class JPakeApp(object):
 
     def _get_new_cid(self):
         tries = 0
-        default = json.dumps({})
+        default = json.dumps({}), None
         while tries < 100:
             new_cid = generate_cid(self.cid_len)
-            success = self.cache.add('jpake:%s' % new_cid, (default, None),
+            success = self.cache.add('%s%s' % (_CPREFIX, new_cid), default,
                                      time=self.ttl)
             if success:
                 break
@@ -101,7 +102,7 @@ class JPakeApp(object):
             raise HTTPNotFound()
 
         if url != 'new_channel':
-            channel_id = 'jpake:%s' % url
+            channel_id = '%s%s' % (_CPREFIX, url)
             kw = {'channel_id': channel_id}
             url = 'channel'
         else:
@@ -141,7 +142,7 @@ class JPakeApp(object):
 
         data, etag = content
 
-        # check the if-None-Match header
+        # check the If-None-Match header
         if request.if_none_match is not None:
             if (hasattr(request.if_none_match, 'etags') and
                 etag in request.if_none_match.etags):
@@ -168,7 +169,7 @@ def make_app(global_conf, **app_conf):
     # XXX Probably want to use the new .ini format instead
     cid_len = int(app_conf.get('cid_len', '3'))
     cache = app_conf.get('cache_servers', '127.0.0.1:11211')
-    app = JPakeApp(cid_len, cache.split(','))
+    app = KeyExchangeApp(cid_len, cache.split(','))
 
     # hooking a profiler
     if global_conf.get('profile', 'false').lower() == 'true':

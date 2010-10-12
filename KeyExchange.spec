@@ -1,11 +1,11 @@
-%define name python-jpake-server
-%define pythonname JPakeServer
+%define name python-keyexchange
+%define pythonname KeyExchange
 %define version 0.1
 %define unmangled_version 0.1
 %define unmangled_version 0.1
 %define release 1
 
-Summary: J-Pake server
+Summary: Key Exchange server
 Name: %{name}
 Version: %{version}
 Release: %{release}
@@ -18,14 +18,15 @@ BuildArch: noarch
 Vendor: Tarek Ziade <tarek@mozilla.com>
 Requires: httpd memcached mod_wsgi python26 pylibmc python26-setuptools python-webob python-meld3 python-paste python-pastedeploy python-pastescript python-repoze-profile
 
-Url: https://hg.mozilla.org/services
+Url: https://hg.mozilla.org/services/server-key-exchange
 
 %description
-=============
-J-PAKE Server
-=============
+===================
+Key Exchange Server
+===================
 
-Implementation of the J-PAKE server.
+Implementation of a key exchange server that can be used with protocols like
+J-PAKE.
 
 See: https://wiki.mozilla.org/Services/Sync/SyncKey/J-PAKE
 
@@ -37,12 +38,12 @@ See: https://wiki.mozilla.org/Services/Sync/SyncKey/J-PAKE
 python2.6 setup.py build
 
 %install
-mkdir -p %{buildroot}%{_sysconfdir}/jpake
-install -m 0644 etc/jpake/jpake.wsgi %{buildroot}%{_sysconfdir}/jpake/jpake.wsgi
-install -m 0644 etc/jpake/production.ini %{buildroot}%{_sysconfdir}/jpake/production.ini
+mkdir -p %{buildroot}%{_sysconfdir}/keyexchange
+install -m 0644 etc/keyexchange.wsgi %{buildroot}%{_sysconfdir}/keyexchange/keyexchange.wsgi
+install -m 0644 etc/keyexchange.ini %{buildroot}%{_sysconfdir}/keyexchange/keyexchange.ini
 mkdir -p %{buildroot}%{_sysconfdir}/httpd
 mkdir -p %{buildroot}%{_sysconfdir}/httpd/conf.d
-install -m 0644 etc/jpake/jpake.conf %{buildroot}%{_sysconfdir}/httpd/conf.d/jpake.conf
+install -m 0644 etc/keyexchange.conf %{buildroot}%{_sysconfdir}/httpd/conf.d/keyexchange.conf
 python2.6 setup.py install --single-version-externally-managed --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
 
 %clean
@@ -51,10 +52,10 @@ rm -rf $RPM_BUILD_ROOT
 
 %files -f INSTALLED_FILES
 
-%dir %{_sysconfdir}/jpake/
+%dir %{_sysconfdir}/keyexchange/
 
-%config(noreplace) %{_sysconfdir}/jpake/*
+%config(noreplace) %{_sysconfdir}/keyexchange/*
 
-%config(noreplace) %{_sysconfdir}/httpd/conf.d/jpake.conf
+%config(noreplace) %{_sysconfdir}/httpd/conf.d/keyexchange.conf
 
 %defattr(-,root,root)

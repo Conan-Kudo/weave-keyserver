@@ -43,8 +43,8 @@ import string
 import time
 import threading
 
-from jpake.tests import _patch
-from jpake.tests.client import JPAKE
+from keyexchange.tests import _patch
+from keyexchange.tests.client import JPAKE
 
 from funkload.FunkLoadTestCase import FunkLoadTestCase
 from funkload.utils import Data

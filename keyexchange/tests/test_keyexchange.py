@@ -42,8 +42,8 @@ import time
 
 from webtest import TestApp
 
-from jpake.tests.client import JPAKE
-from jpake.wsgiapp import make_app
+from keyexchange.tests.client import JPAKE
+from keyexchange.wsgiapp import make_app
 
 
 class User(threading.Thread):
