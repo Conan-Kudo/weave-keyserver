@@ -48,7 +48,7 @@ requires = ['WebOb', 'Paste', 'PasteScript', 'repoze.profile']
 
 class _bdist_rpm(bdist_rpm):
     def _make_spec_file(self):
-        return open('JPakeServer.spec').read().split('\n')
+        return open('KeyExchange.spec').read().split('\n')
 
 setup(name='KeyExchange', author='Tarek Ziade',
       url='https://hg.mozilla.org/services/server-key-exchange',
