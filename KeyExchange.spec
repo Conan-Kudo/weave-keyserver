@@ -44,13 +44,21 @@ install -m 0644 etc/keyexchange.ini %{buildroot}%{_sysconfdir}/keyexchange/keyex
 mkdir -p %{buildroot}%{_sysconfdir}/httpd
 mkdir -p %{buildroot}%{_sysconfdir}/httpd/conf.d
 install -m 0644 etc/keyexchange.conf %{buildroot}%{_sysconfdir}/httpd/conf.d/keyexchange.conf
+mkdir -p %{buildroot}%{_localstatedir}/log
+touch %{buildroot}%{_localstatedir}/log/keyexchange.log
 python2.6 setup.py install --single-version-externally-managed --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
+%post
+touch %{_localstatedir}/log/keyexchange.log
+chown apache:apache %{_localstatedir}/log/keyexchange.log
+chmod 750 %{_localstatedir}/log/keyexchange.log
 
 %files -f INSTALLED_FILES
+
+%attr(750, apache, apache) %ghost %{_localstatedir}/log/keyexchange.log
 
 %dir %{_sysconfdir}/keyexchange/
 
