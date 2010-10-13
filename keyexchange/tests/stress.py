@@ -231,5 +231,15 @@ class StressTest(FunkLoadTestCase):
         received_data.sort()
         self.assertEqual(original_data, received_data)
 
+    def test_one_side(self):
+        res = self.get(self.root + '/new_channel')
+        cid = str(json.loads(res.body))
+        curl =self.root + '/' + cid
+        data = json.dumps('*' * 200)
+        self.put(curl, Data('application/json', data))
+        res = self.get(curl)
+        self.assertEquals(res.body, data)
+
+
 if __name__ == '__main__':
     unittest.main()
