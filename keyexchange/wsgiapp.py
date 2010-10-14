@@ -68,7 +68,7 @@ _NOT_FOUND, _FAILED, _SUCCESS = range(3)
 
 class KeyExchangeApp(object):
 
-    def __init__(self, cid_len, cache_servers=None, ttl=36000):
+    def __init__(self, cid_len, cache_servers=None, ttl=300):
         self.cid_len = cid_len
         self.max_combos = len(CID_CHARS) ** cid_len
         self.ttl = ttl
