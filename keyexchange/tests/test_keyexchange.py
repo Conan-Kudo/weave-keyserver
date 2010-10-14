@@ -65,7 +65,7 @@ class User(threading.Thread):
         self.id = hash * 4
         if data is not None:
             res = self.app.get(self.root+'/new_channel',
-                               headers={'X-Weave-ClientID': self.id})
+                               headers={'X-KeyExchange-Id': self.id})
             self.cid = str(json.loads(res.body))
         else:
             self.cid = cid
@@ -78,7 +78,7 @@ class User(threading.Thread):
 
             res = self.app.get(self.curl,
                                headers={'If-None-Match': etag,
-                                        'X-Weave-ClientID': self.id
+                                        'X-KeyExchange-Id': self.id
                                    })
 
             status = res.status_int
@@ -105,7 +105,7 @@ class User(threading.Thread):
 
 class Sender(User):
     def run(self):
-        headers = {'X-Weave-ClientID': self.id}
+        headers = {'X-KeyExchange-Id': self.id}
         # step 1
         print '%s sends step one' % self.name
         one = json.dumps(self.pake.one(), ensure_ascii=True)
@@ -138,7 +138,7 @@ class Sender(User):
 
 class Receiver(User):
     def run(self):
-        headers = {'X-Weave-ClientID': self.id}
+        headers = {'X-KeyExchange-Id': self.id}
 
         # waiting for step 1
         print '%s waits for step one from sender' % self.name
@@ -209,7 +209,7 @@ class TestWsgiApp(unittest.TestCase):
         self.assertEqual(original_data, received_data)
 
     def test_behavior(self):
-        headers = {'X-Weave-ClientID': 'b' * 256}
+        headers = {'X-KeyExchange-Id': 'b' * 256}
 
         # make sure we can't play with a channel that does not exist
         self.app.put('/boo', params='somedata', headers=headers, status=404)
@@ -241,18 +241,18 @@ class TestWsgiApp(unittest.TestCase):
 
 
     def test_id_header(self):
-        # all calls must be made with a unique 'X-Weave-ClientID' header
+        # all calls must be made with a unique 'X-KeyExchange-Id' header
         # this id must be of length 256
 
         # no id issues a 400
         self.app.get('/new_channel', status=400)
 
         # an id with the wrong size issues a 400
-        headers = {'X-Weave-ClientID': 'boo'}
+        headers = {'X-KeyExchange-Id': 'boo'}
         self.app.get('/new_channel', headers=headers, status=400)
 
         # an id with the right size does the job
-        headers = {'X-Weave-ClientID': 'b' * 256}
+        headers = {'X-KeyExchange-Id': 'b' * 256}
         res = self.app.get('/new_channel', headers=headers)
         cid = str(json.loads(res.body))
 
@@ -262,11 +262,11 @@ class TestWsgiApp(unittest.TestCase):
                      status=200)
 
         # another id is used on the other side
-        headers2 = {'X-Weave-ClientID': 'c' * 256}
+        headers2 = {'X-KeyExchange-Id': 'c' * 256}
         self.app.get(curl,  headers=headers2, status=200)
 
         # try to get the data with a different id and it's gone
-        headers2 = {'X-Weave-ClientID': 'e' * 256}
+        headers2 = {'X-KeyExchange-Id': 'e' * 256}
         self.app.get(curl,  headers=headers2, status=400)
 
         # yes, gone..

@@ -96,7 +96,7 @@ class KeyExchangeApp(object):
 
     @wsgify
     def __call__(self, request):
-        client_id = request.headers.get('X-Weave-ClientID')
+        client_id = request.headers.get('X-KeyExchange-Id')
         method = request.method
         url = request.environ['PATH_INFO']
         match = _URL.match(url)
