@@ -45,7 +45,8 @@ from paste.translogger import TransLogger
 from repoze.profile.profiler import AccumulatingProfileMiddleware as Profiler
 
 from webob.dec import wsgify
-from webob.exc import HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable
+from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
+                       HTTPBadRequest)
 
 try:
     from pylibmc import Client
@@ -55,12 +56,14 @@ except (ImportError, RuntimeError):
     except ImportError:
         from keyexchange.util import MemoryClient as Client  # NOQA
 
-from keyexchange.util import generate_cid, json_response, CID_CHARS
+from keyexchange.util import (generate_cid, json_response, CID_CHARS,
+                              PrefixedCache)
 
 
 _URL = re.compile('/(new_channel|[a-zA-Z0-9]*)/?')
 _CPREFIX = 'keyexchange:'
 _INC_KEY = '%schannel_id' % _CPREFIX
+_NOT_FOUND, _FAILED, _SUCCESS = range(3)
 
 
 class KeyExchangeApp(object):
@@ -71,15 +74,14 @@ class KeyExchangeApp(object):
         self.ttl = ttl
         if cache_servers is None:
             cache_servers = ['127.0.0.1:11211']
-        self.cache = Client(cache_servers)
+        self.cache = PrefixedCache(Client(cache_servers), _CPREFIX)
 
-    def _get_new_cid(self):
+    def _get_new_cid(self, client_id):
         tries = 0
-        default = json.dumps({}), None
+        content = [client_id], json.dumps({}), None
         while tries < 100:
             new_cid = generate_cid(self.cid_len)
-            success = self.cache.add('%s%s' % (_CPREFIX, new_cid), default,
-                                     time=self.ttl)
+            success = self.cache.add(new_cid, content, time=self.ttl)
             if success:
                 break
             tries += 1
@@ -91,33 +93,68 @@ class KeyExchangeApp(object):
 
     @wsgify
     def __call__(self, request):
+        client_id = request.headers.get('X-Weave-ClientID')
+        method = request.method
         url = request.environ['PATH_INFO']
         match = _URL.match(url)
         if match is None:
             raise HTTPNotFound()
 
         url = match.groups()[0]
-        method = request.method
-        if method not in ('GET', 'PUT', 'DELETE'):
+        if url == 'new_channel':
+            # creation of a channel
+            if method != 'GET':
+                raise HTTPNotFound()
+            if not self._valid_client_id(client_id):
+                raise HTTPBadRequest()
+
+            return json_response(self._get_new_cid(client_id))
+
+        # validating the client id - or registering id #2
+        self._check_client_id(url, client_id)
+
+        # actions are dispatched in this class
+        method = getattr(self, '%s_channel' % method.lower(), None)
+        if method is None:
             raise HTTPNotFound()
 
-        if url != 'new_channel':
-            channel_id = '%s%s' % (_CPREFIX, url)
-            kw = {'channel_id': channel_id}
-            url = 'channel'
+        return method(request, url)
+
+    def _valid_client_id(self, client_id):
+        return client_id is not None and len(client_id) == 256
+
+    def _check_client_id(self, channel_id, client_id):
+        """Registers the client id into the channel.
+
+        If there are already two registered ids, the channel is closed
+        and we send back a 400.
+        """
+        if not self._valid_client_id(client_id):
+            # we need to kill the channel
+            self._delete_channel(channel_id)
+            raise HTTPBadRequest()
+
+        content = self.cache.get(channel_id)
+        if content is None:
+            raise HTTPNotFound()
+
+        ids, data, etag = content
+        if len(ids) < 2:
+            # first or second id, if not already registered
+            if client_id in ids:
+                return   # already registered
+            ids.append(client_id)
         else:
-            kw = {}
+            # already full, so either the id is present, either it's a 3rd one
+            if client_id in ids:
+                return  # already registered
 
-        method_name = '%s_%s' % (method.lower(), url)
-        if not hasattr(self, method_name):
-            raise HTTPNotFound()
+            # that's an unknown id
+            self._delete_channel(channel_id)
+            raise HTTPBadRequest()
 
-        method = getattr(self, method_name)
-        return method(request, **kw)
-
-    def get_new_channel(self, request):
-        """Returns a new channel id"""
-        return json_response(self._get_new_cid())
+        # looking good
+        self.cache.set(channel_id, (ids, data, etag), time=self.ttl)
 
     def _etag(self, data, dt=None):
         if dt is None:
@@ -126,12 +163,17 @@ class KeyExchangeApp(object):
 
     def put_channel(self, request, channel_id):
         """Append data into channel."""
+        content = self.cache.get(channel_id)
+        if content is None:
+            raise HTTPNotFound()
+
+        ids, old_data, old_etag = content
         data = request.body
         etag = self._etag(data)
-        if not self.cache.replace(channel_id, (request.body, etag),
-                                  time=self.ttl):
-            # if a replace fails, it means the channel does not exists
-            raise HTTPNotFound()
+        if not self.cache.set(channel_id, (ids, request.body, etag),
+                              time=self.ttl):
+            raise HTTPServiceUnavailable()
+
         return json_response('', etag=etag)
 
     def get_channel(self, request, channel_id):
@@ -140,7 +182,7 @@ class KeyExchangeApp(object):
         if content is None:
             raise HTTPNotFound()
 
-        data, etag = content
+        ids, data, etag = content
 
         # check the If-None-Match header
         if request.if_none_match is not None:
@@ -150,17 +192,23 @@ class KeyExchangeApp(object):
 
         return json_response(data, dump=False, etag=etag)
 
-    def delete_channel(self, request, channel_id):
-        """Delete a channel."""
+    def _delete_channel(self, channel_id):
         res = self.cache.get(channel_id)
         if res is None:
-            raise HTTPNotFound()
-
+            return _NOT_FOUND
         res = self.cache.delete(channel_id)
         if not res:
             # failed to delete
-            raise HTTPServiceUnavailable()
+            return _FAILED
+        return _SUCCESS
 
+    def delete_channel(self, request, channel_id):
+        """Delete a channel."""
+        res = self._delete_channel(channel_id)
+        if res == _NOT_FOUND:
+            raise HTTPNotFound()
+        elif res == _FAILED:
+            raise HTTPServiceUnavailable()
         return json_response('')
 
 

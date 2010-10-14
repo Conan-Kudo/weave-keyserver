@@ -86,3 +86,21 @@ class MemoryClient(dict):
             return True  # that's how memcache libs do...
         del self[key]
         return True
+
+
+class PrefixedCache(object):
+    def __init__(self, cache, prefix=''):
+        self.cache = cache
+        self.prefix = ''
+
+    def get(self, key):
+        return self.cache.get(self.prefix + key)
+
+    def set(self, key, value, **kw):
+        return self.cache.set(self.prefix + key, value, **kw)
+
+    def delete(self, key):
+        return self.cache.delete(self.prefix + key)
+
+    def add(self, key, value, **kw):
+        return self.cache.add(self.prefix + key, value, **kw)

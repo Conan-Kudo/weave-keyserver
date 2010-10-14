@@ -39,6 +39,8 @@ import unittest
 import threading
 import json
 import time
+import random
+import hashlib
 
 from webtest import TestApp
 
@@ -58,8 +60,12 @@ class User(threading.Thread):
         self.name = name
         self.pake = JPAKE(passwd, signerid=name)
         self.data = data
+        hash = hashlib.sha256(str(random.randint(1, 1000))).hexdigest()
+
+        self.id = hash * 4
         if data is not None:
-            res = self.app.get(self.root+'/new_channel')
+            res = self.app.get(self.root+'/new_channel',
+                               headers={'X-Weave-ClientID': self.id})
             self.cid = str(json.loads(res.body))
         else:
             self.cid = cid
@@ -71,7 +77,9 @@ class User(threading.Thread):
         while status == 304 and attempts < 10:
 
             res = self.app.get(self.curl,
-                                headers={'If-None-Match': etag})
+                               headers={'If-None-Match': etag,
+                                        'X-Weave-ClientID': self.id
+                                   })
 
             status = res.status_int
             attempts +=1
@@ -97,10 +105,11 @@ class User(threading.Thread):
 
 class Sender(User):
     def run(self):
+        headers = {'X-Weave-ClientID': self.id}
         # step 1
         print '%s sends step one' % self.name
         one = json.dumps(self.pake.one(), ensure_ascii=True)
-        res = self.app.put(self.curl, params=one)
+        res = self.app.put(self.curl, params=one, headers=headers)
         etag = res.headers['ETag']
 
         print '%s now waits for step one from receiver' % self.name
@@ -110,7 +119,7 @@ class Sender(User):
         # step 2
         print '%s sends step two' % self.name
         two = json.dumps(self.pake.two(other_one))
-        res = self.app.put(self.curl, params=two)
+        res = self.app.put(self.curl, params=two, headers=headers)
         etag = res.headers['ETag']
         time.sleep(.2)
 
@@ -124,11 +133,13 @@ class Sender(User):
         # and we send the data (no crypting in the tests)
         print '%s sends the data' % self.name
         data = json.dumps(self.data)
-        res = self.app.put(self.curl, params=data)
+        res = self.app.put(self.curl, params=data, headers=headers)
 
 
 class Receiver(User):
     def run(self):
+        headers = {'X-Weave-ClientID': self.id}
+
         # waiting for step 1
         print '%s waits for step one from sender' % self.name
         other_one = self._wait_data()
@@ -136,7 +147,7 @@ class Receiver(User):
         # step 1
         print '%s sends step one to receiver' % self.name
         one = json.dumps(self.pake.one(), ensure_ascii=True)
-        res = self.app.put(self.curl, params=one)
+        res = self.app.put(self.curl, params=one, headers=headers)
         etag = res.headers['ETag']
 
         # waiting for step 2
@@ -146,7 +157,7 @@ class Receiver(User):
         # sending step 2
         print '%s sends step two' % self.name
         two = json.dumps(self.pake.two(other_one))
-        res = self.app.put(self.curl, params=two)
+        res = self.app.put(self.curl, params=two, headers=headers)
         etag = res.headers['ETag']
 
         # then we build the key
@@ -161,6 +172,7 @@ class TestWsgiApp(unittest.TestCase):
 
     def setUp(self):
         self.app = TestApp(make_app({}))
+
 
     def test_session(self):
         # we want to send data in a secure channel
@@ -197,18 +209,20 @@ class TestWsgiApp(unittest.TestCase):
         self.assertEqual(original_data, received_data)
 
     def test_behavior(self):
+        headers = {'X-Weave-ClientID': 'b' * 256}
+
         # make sure we can't play with a channel that does not exist
-        self.app.put('/boo', params='somedata', status=404)
-        self.app.get('/boo', status=404)
-        self.app.delete('/boo', status=404)
+        self.app.put('/boo', params='somedata', headers=headers, status=404)
+        self.app.get('/boo', status=404, headers=headers)
+        self.app.delete('/boo', status=404, headers=headers)
 
         # testing the removal of a channel
-        res = self.app.get('/new_channel')
+        res = self.app.get('/new_channel', headers=headers)
         cid = str(json.loads(res.body))
         curl = '/%s' % cid
-        self.app.delete(curl)
-        self.app.put(curl,  params='somedata', status=404)
-        self.app.get(curl, status=404)
+        self.app.delete(curl, headers=headers)
+        self.app.put(curl,  params='somedata', status=404, headers=headers)
+        self.app.get(curl, status=404, headers=headers)
 
         # let's try a really small ttl to make sure it works
         if isinstance(self.app.app.cache, dict):
@@ -216,11 +230,44 @@ class TestWsgiApp(unittest.TestCase):
             return
 
         self.app.app.ttl = 1.
-        res = self.app.get('/new_channel')
+        res = self.app.get('/new_channel', headers=headers)
         cid = str(json.loads(res.body))
         curl = '/%s' % cid
-        self.app.put(curl,  params='somedata', status=200)
+        self.app.put(curl,  params='somedata', status=200, headers=headers)
         time.sleep(1.1)
 
         # should be dead now
-        self.app.put(curl,  params='somedata', status=404)
+        self.app.put(curl,  params='somedata', status=404, headers=headers)
+
+
+    def test_id_header(self):
+        # all calls must be made with a unique 'X-Weave-ClientID' header
+        # this id must be of length 256
+
+        # no id issues a 400
+        self.app.get('/new_channel', status=400)
+
+        # an id with the wrong size issues a 400
+        headers = {'X-Weave-ClientID': 'boo'}
+        self.app.get('/new_channel', headers=headers, status=400)
+
+        # an id with the right size does the job
+        headers = {'X-Weave-ClientID': 'b' * 256}
+        res = self.app.get('/new_channel', headers=headers)
+        cid = str(json.loads(res.body))
+
+        # then we can put stuff as usual in the channel
+        curl = '/%s' % cid
+        self.app.put(curl, params='somedata', headers=headers,
+                     status=200)
+
+        # another id is used on the other side
+        headers2 = {'X-Weave-ClientID': 'c' * 256}
+        self.app.get(curl,  headers=headers2, status=200)
+
+        # try to get the data with a different id and it's gone
+        headers2 = {'X-Weave-ClientID': 'e' * 256}
+        self.app.get(curl,  headers=headers2, status=400)
+
+        # yes, gone..
+        self.app.get(curl, status=404, headers=headers)
