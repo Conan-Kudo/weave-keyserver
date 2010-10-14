@@ -1,10 +1,13 @@
 VIRTUALENV = virtualenv
-NOSE = bin/nosetests -s
+NOSE = bin/nosetests -s --with-xunit
 TESTS = keyexchange/tests
 PYTHON = bin/python
 EZ = bin/easy_install
+COVEROPTS = --cover-html --cover-html-dir=html --with-coverage --cover-package=keyexchange
+COVERAGE = bin/coverage
+PYLINT = bin/pylint
 
-.PHONY: all build test bench_one bench bend_report build_rpm
+.PHONY: all build test bench_one bench bend_report build_rpm hudson lint
 
 all:	build
 
@@ -14,6 +17,8 @@ build:
 	$(EZ) nose
 	$(EZ) WebTest
 	$(EZ) Funkload
+	$(EZ) pylint
+	$(EZ) coverage
 
 test:
 	$(NOSE) $(TESTS)
@@ -29,3 +34,12 @@ bench_report:
 
 build_rpm:
 	$(PYTHON) setup.py bdist_rpm
+
+hudson:
+	rm -f coverage.xml
+	- $(COVERAGE) run --source=keyexchange $(NOSE) $(TESTS); $(COVERAGE) xml
+
+lint:
+	rm -f pylint.txt
+	- $(PYLINT) -f parseable --rcfile=pylintrc $(PKGS) > pylint.txt
+
