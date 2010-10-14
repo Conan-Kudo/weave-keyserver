@@ -213,7 +213,7 @@ class KeyExchangeApp(object):
 
 
 def make_app(global_conf, **app_conf):
-    """Returns a J-PAKE Application."""
+    """Returns a Key Exchange Application."""
     # XXX Probably want to use the new .ini format instead
     cid_len = int(app_conf.get('cid_len', '3'))
     cache = app_conf.get('cache_servers', '127.0.0.1:11211')
