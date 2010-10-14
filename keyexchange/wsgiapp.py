@@ -40,6 +40,7 @@ import datetime
 import re
 from hashlib import md5
 import json
+import time
 
 from paste.translogger import TransLogger
 from repoze.profile.profiler import AccumulatingProfileMiddleware as Profiler
@@ -78,10 +79,12 @@ class KeyExchangeApp(object):
 
     def _get_new_cid(self, client_id):
         tries = 0
-        content = [client_id], json.dumps({}), None
+        ttl = time.time() + self.ttl
+        content = ttl, [client_id], json.dumps({}), None
+
         while tries < 100:
             new_cid = generate_cid(self.cid_len)
-            success = self.cache.add(new_cid, content, time=self.ttl)
+            success = self.cache.add(new_cid, content, time=ttl)
             if success:
                 break
             tries += 1
@@ -138,7 +141,7 @@ class KeyExchangeApp(object):
         if content is None:
             raise HTTPNotFound()
 
-        ids, data, etag = content
+        ttl, ids, data, etag = content
         if len(ids) < 2:
             # first or second id, if not already registered
             if client_id in ids:
@@ -154,7 +157,7 @@ class KeyExchangeApp(object):
             raise HTTPBadRequest()
 
         # looking good
-        self.cache.set(channel_id, (ids, data, etag), time=self.ttl)
+        self.cache.set(channel_id, (ttl, ids, data, etag), time=ttl)
 
     def _etag(self, data, dt=None):
         if dt is None:
@@ -167,11 +170,11 @@ class KeyExchangeApp(object):
         if content is None:
             raise HTTPNotFound()
 
-        ids, old_data, old_etag = content
+        ttl, ids, old_data, old_etag = content
         data = request.body
         etag = self._etag(data)
-        if not self.cache.set(channel_id, (ids, request.body, etag),
-                              time=self.ttl):
+        if not self.cache.set(channel_id, (ttl, ids, request.body, etag),
+                              time=ttl):
             raise HTTPServiceUnavailable()
 
         return json_response('', etag=etag)
@@ -182,7 +185,7 @@ class KeyExchangeApp(object):
         if content is None:
             raise HTTPNotFound()
 
-        ids, data, etag = content
+        ttl, ids, data, etag = content
 
         # check the If-None-Match header
         if request.if_none_match is not None:
