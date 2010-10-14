@@ -114,14 +114,14 @@ class KeyExchangeApp(object):
             return json_response(self._get_new_cid(client_id))
 
         # validating the client id - or registering id #2
-        self._check_client_id(url, client_id)
+        channel_content = self._check_client_id(url, client_id)
 
         # actions are dispatched in this class
         method = getattr(self, '%s_channel' % method.lower(), None)
         if method is None:
             raise HTTPNotFound()
 
-        return method(request, url)
+        return method(request, url, channel_content)
 
     def _valid_client_id(self, client_id):
         return client_id is not None and len(client_id) == 256
@@ -130,7 +130,7 @@ class KeyExchangeApp(object):
         """Registers the client id into the channel.
 
         If there are already two registered ids, the channel is closed
-        and we send back a 400.
+        and we send back a 400. Also returns the new channel content.
         """
         if not self._valid_client_id(client_id):
             # we need to kill the channel
@@ -145,32 +145,33 @@ class KeyExchangeApp(object):
         if len(ids) < 2:
             # first or second id, if not already registered
             if client_id in ids:
-                return   # already registered
+                return content   # already registered
             ids.append(client_id)
         else:
             # already full, so either the id is present, either it's a 3rd one
             if client_id in ids:
-                return  # already registered
+                return  content  # already registered
 
             # that's an unknown id
             self._delete_channel(channel_id)
             raise HTTPBadRequest()
 
+        content = ttl, ids, data, etag
+
         # looking good
-        self.cache.set(channel_id, (ttl, ids, data, etag), time=ttl)
+        if not self.cache.set(channel_id, content, time=ttl):
+            raise HTTPServiceUnavailable()
+
+        return content
 
     def _etag(self, data, dt=None):
         if dt is None:
             dt = datetime.datetime.now()
         return md5('%s:%s' % (len(data), dt.isoformat())).hexdigest()
 
-    def put_channel(self, request, channel_id):
+    def put_channel(self, request, channel_id, existing_content):
         """Append data into channel."""
-        content = self.cache.get(channel_id)
-        if content is None:
-            raise HTTPNotFound()
-
-        ttl, ids, old_data, old_etag = content
+        ttl, ids, old_data, old_etag = existing_content
         data = request.body
         etag = self._etag(data)
         if not self.cache.set(channel_id, (ttl, ids, request.body, etag),
@@ -179,13 +180,9 @@ class KeyExchangeApp(object):
 
         return json_response('', etag=etag)
 
-    def get_channel(self, request, channel_id):
+    def get_channel(self, request, channel_id, existing_content):
         """Grabs data from channel if available."""
-        content = self.cache.get(channel_id)
-        if content is None:
-            raise HTTPNotFound()
-
-        ttl, ids, data, etag = content
+        ttl, ids, data, etag = existing_content
 
         # check the If-None-Match header
         if request.if_none_match is not None:
@@ -205,7 +202,7 @@ class KeyExchangeApp(object):
             return _FAILED
         return _SUCCESS
 
-    def delete_channel(self, request, channel_id):
+    def delete_channel(self, request, channel_id, channel_content):
         """Delete a channel."""
         res = self._delete_channel(channel_id)
         if res == _NOT_FOUND:
