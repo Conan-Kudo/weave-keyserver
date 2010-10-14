@@ -6,6 +6,7 @@ EZ = bin/easy_install
 COVEROPTS = --cover-html --cover-html-dir=html --with-coverage --cover-package=keyexchange
 COVERAGE = bin/coverage
 PYLINT = bin/pylint
+PKGS = keyexchange
 
 .PHONY: all build test bench_one bench bend_report build_rpm hudson lint
 
