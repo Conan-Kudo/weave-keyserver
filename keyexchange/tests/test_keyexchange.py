@@ -46,6 +46,7 @@ from webtest import TestApp
 
 from keyexchange.tests.client import JPAKE
 from keyexchange.wsgiapp import make_app
+from keyexchange.util import MemoryClient
 
 
 class User(threading.Thread):
@@ -65,7 +66,8 @@ class User(threading.Thread):
         self.id = hash * 4
         if data is not None:
             res = self.app.get(self.root+'/new_channel',
-                               headers={'X-KeyExchange-Id': self.id})
+                               headers={'X-KeyExchange-Id': self.id},
+                               extra_environ=self.app.env)
             self.cid = str(json.loads(res.body))
         else:
             self.cid = cid
@@ -77,6 +79,7 @@ class User(threading.Thread):
         while status == 304 and attempts < 10:
 
             res = self.app.get(self.curl,
+                               extra_environ=self.app.env,
                                headers={'If-None-Match': etag,
                                         'X-KeyExchange-Id': self.id
                                    })
@@ -107,33 +110,36 @@ class Sender(User):
     def run(self):
         headers = {'X-KeyExchange-Id': self.id}
         # step 1
-        print '%s sends step one' % self.name
+        #print '%s sends step one' % self.name
         one = json.dumps(self.pake.one(), ensure_ascii=True)
-        res = self.app.put(self.curl, params=one, headers=headers)
+        res = self.app.put(self.curl, params=one, headers=headers,
+                           extra_environ=self.app.env)
         etag = res.headers['ETag']
 
-        print '%s now waits for step one from receiver' % self.name
+        #print '%s now waits for step one from receiver' % self.name
         other_one = self._wait_data(etag)
-        print '%s received step one' % self.name
+        #print '%s received step one' % self.name
 
         # step 2
-        print '%s sends step two' % self.name
+        #print '%s sends step two' % self.name
         two = json.dumps(self.pake.two(other_one))
-        res = self.app.put(self.curl, params=two, headers=headers)
+        res = self.app.put(self.curl, params=two, headers=headers,
+                           extra_environ=self.app.env)
         etag = res.headers['ETag']
         time.sleep(.2)
 
         # now wait for step 2 from the other iside
         other_two = self._wait_data(etag)
-        print '%s received step two from receiver' % self.name
+        #print '%s received step two from receiver' % self.name
 
         # then we build the key
         self.key = self.pake.three(other_two)
 
         # and we send the data (no crypting in the tests)
-        print '%s sends the data' % self.name
+        #print '%s sends the data' % self.name
         data = json.dumps(self.data)
-        res = self.app.put(self.curl, params=data, headers=headers)
+        res = self.app.put(self.curl, params=data, headers=headers,
+                           extra_environ=self.app.env)
 
 
 class Receiver(User):
@@ -141,23 +147,25 @@ class Receiver(User):
         headers = {'X-KeyExchange-Id': self.id}
 
         # waiting for step 1
-        print '%s waits for step one from sender' % self.name
+        #print '%s waits for step one from sender' % self.name
         other_one = self._wait_data()
 
         # step 1
-        print '%s sends step one to receiver' % self.name
+        #print '%s sends step one to receiver' % self.name
         one = json.dumps(self.pake.one(), ensure_ascii=True)
-        res = self.app.put(self.curl, params=one, headers=headers)
+        res = self.app.put(self.curl, params=one, headers=headers,
+                           extra_environ=self.app.env)
         etag = res.headers['ETag']
 
         # waiting for step 2
-        print '%s waits for step two from sender' % self.name
+        #print '%s waits for step two from sender' % self.name
         other_two = self._wait_data(etag)
 
         # sending step 2
-        print '%s sends step two' % self.name
+        #print '%s sends step two' % self.name
         two = json.dumps(self.pake.two(other_one))
-        res = self.app.put(self.curl, params=two, headers=headers)
+        res = self.app.put(self.curl, params=two, headers=headers,
+                           extra_environ=self.app.env)
         etag = res.headers['ETag']
 
         # then we build the key
@@ -165,14 +173,22 @@ class Receiver(User):
 
         # and we get the data (no crypting in the tests)
         self.data = self._wait_data(etag)
-        print '%s received the data' % self.name
+        #print '%s received the data' % self.name
 
 
 class TestWsgiApp(unittest.TestCase):
 
     def setUp(self):
-        self.app = TestApp(make_app({}))
+        app = make_app({})
+        # we don't test this here
+        app.max_bad_request_calls = 1000
+        self.app = TestApp(app)
+        self.app.env = self.env = {'REMOTE_ADDR': '127.0.0.1'}
 
+    def tearDown(self):
+        # flushing 127.0.0.1
+        self.app.app.cache.delete('127.0.0.1')
+        self.app.app.bcache.delete('127.0.0.1')
 
     def test_session(self):
         # we want to send data in a secure channel
@@ -212,32 +228,46 @@ class TestWsgiApp(unittest.TestCase):
         headers = {'X-KeyExchange-Id': 'b' * 256}
 
         # make sure we can't play with a channel that does not exist
-        self.app.put('/boo', params='somedata', headers=headers, status=404)
-        self.app.get('/boo', status=404, headers=headers)
-        self.app.delete('/boo', status=404, headers=headers)
+        self.app.put('/boo', params='somedata', headers=headers, status=404,
+                     extra_environ=self.env)
+        self.app.get('/boo', status=404, headers=headers,
+                     extra_environ=self.env)
+        self.app.delete('/boo', status=404, headers=headers,
+                        extra_environ=self.env)
 
         # testing the removal of a channel
-        res = self.app.get('/new_channel', headers=headers)
+        res = self.app.get('/new_channel', headers=headers,
+                           extra_environ=self.env)
         cid = str(json.loads(res.body))
         curl = '/%s' % cid
-        self.app.delete(curl, headers=headers)
-        self.app.put(curl,  params='somedata', status=404, headers=headers)
-        self.app.get(curl, status=404, headers=headers)
+        self.app.delete(curl, headers=headers, extra_environ=self.env)
+        self.app.put(curl,  params='somedata', status=404, headers=headers,
+                     extra_environ=self.env)
+        self.app.get(curl, status=404, headers=headers,
+                     extra_environ=self.env)
 
         # let's try a really small ttl to make sure it works
         if isinstance(self.app.app.cache, dict):
             # memory fallback, bye-bye
             return
 
-        self.app.app.ttl = 1.
-        res = self.app.get('/new_channel', headers=headers)
+        app = self.app.app.app
+        if isinstance(app.cache.cache, MemoryClient):
+            return   # TTL is not implemented in the MemoryClient
+
+        app.ttl = 1.
+        res = self.app.get('/new_channel', headers=headers,
+                           extra_environ=self.env)
         cid = str(json.loads(res.body))
         curl = '/%s' % cid
-        self.app.put(curl,  params='somedata', status=200, headers=headers)
-        time.sleep(1.1)
+        self.app.put(curl,  params='somedata', status=200, headers=headers,
+                     extra_environ=self.env)
+
+        time.sleep(1.5)
 
         # should be dead now
-        self.app.put(curl,  params='somedata', status=404, headers=headers)
+        self.app.put(curl,  params='somedata', status=404, headers=headers,
+                     extra_environ=self.env)
 
 
     def test_id_header(self):
@@ -245,29 +275,34 @@ class TestWsgiApp(unittest.TestCase):
         # this id must be of length 256
 
         # no id issues a 400
-        self.app.get('/new_channel', status=400)
+        self.app.get('/new_channel', status=400, extra_environ=self.env)
 
         # an id with the wrong size issues a 400
         headers = {'X-KeyExchange-Id': 'boo'}
-        self.app.get('/new_channel', headers=headers, status=400)
+        self.app.get('/new_channel', headers=headers, status=400,
+                     extra_environ=self.env)
 
         # an id with the right size does the job
         headers = {'X-KeyExchange-Id': 'b' * 256}
-        res = self.app.get('/new_channel', headers=headers)
+        res = self.app.get('/new_channel', headers=headers,
+                           extra_environ=self.env)
         cid = str(json.loads(res.body))
 
         # then we can put stuff as usual in the channel
         curl = '/%s' % cid
         self.app.put(curl, params='somedata', headers=headers,
-                     status=200)
+                     status=200, extra_environ=self.env)
 
         # another id is used on the other side
         headers2 = {'X-KeyExchange-Id': 'c' * 256}
-        self.app.get(curl,  headers=headers2, status=200)
+        self.app.get(curl,  headers=headers2, status=200,
+                     extra_environ=self.env)
 
         # try to get the data with a different id and it's gone
         headers2 = {'X-KeyExchange-Id': 'e' * 256}
-        self.app.get(curl,  headers=headers2, status=400)
+        self.app.get(curl,  headers=headers2, status=400,
+                     extra_environ=self.env)
 
         # yes, gone..
-        self.app.get(curl, status=404, headers=headers)
+        self.app.get(curl, status=404, headers=headers,
+                     extra_environ=self.env)

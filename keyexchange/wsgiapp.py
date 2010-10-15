@@ -49,16 +49,10 @@ from webob.dec import wsgify
 from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
                        HTTPBadRequest)
 
-try:
-    from pylibmc import Client
-except (ImportError, RuntimeError):
-    try:
-        from memcache import Client  # NOQA
-    except ImportError:
-        from keyexchange.util import MemoryClient as Client  # NOQA
 
 from keyexchange.util import (generate_cid, json_response, CID_CHARS,
-                              PrefixedCache)
+                              PrefixedCache, Cache)
+from keyexchange.filtering import IPFiltering
 
 
 _URL = re.compile('/(new_channel|[a-zA-Z0-9]*)/?')
@@ -75,7 +69,7 @@ class KeyExchangeApp(object):
         self.ttl = ttl
         if cache_servers is None:
             cache_servers = ['127.0.0.1:11211']
-        self.cache = PrefixedCache(Client(cache_servers), _CPREFIX)
+        self.cache = PrefixedCache(Cache(cache_servers), _CPREFIX)
 
     def _get_new_cid(self, client_id):
         tries = 0
@@ -216,8 +210,8 @@ def make_app(global_conf, **app_conf):
     """Returns a Key Exchange Application."""
     # XXX Probably want to use the new .ini format instead
     cid_len = int(app_conf.get('cid_len', '3'))
-    cache = app_conf.get('cache_servers', '127.0.0.1:11211')
-    app = KeyExchangeApp(cid_len, cache.split(','))
+    cache = app_conf.get('cache_servers', '127.0.0.1:11211').split(',')
+    app = KeyExchangeApp(cid_len, cache)
 
     # hooking a profiler
     if global_conf.get('profile', 'false').lower() == 'true':
@@ -231,5 +225,11 @@ def make_app(global_conf, **app_conf):
     if global_conf.get('translogger', 'false').lower() == 'true':
         app = TransLogger(app, logger_name='jpakeapp',
                           setup_console_handler=True)
+
+
+    # IP Filtering middleware
+    period = int(app_conf.get('filter_period', '300'))
+    max_calls = int(app_conf.get('max_calls_per_ip', '100'))
+    app = IPFiltering(app, cache, period, max_calls)
 
     return app
