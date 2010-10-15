@@ -41,14 +41,6 @@ import random
 
 from webob import Response
 
-try:
-    from pylibmc import Client as Cache
-except (ImportError, RuntimeError):
-    try:
-        from memcache import Client as Cache # NOQA
-    except ImportError:
-        from keyexchange.util import MemoryClient as Cache  # NOQA
-
 
 CID_CHARS = string.digits + string.lowercase
 
@@ -113,3 +105,12 @@ class PrefixedCache(object):
 
     def add(self, key, value, **kw):
         return self.cache.add(self.prefix + key, value, **kw)
+
+
+try:
+    from pylibmc import Client as Cache
+except (ImportError, RuntimeError):
+    try:
+        from memcache import Client as Cache # NOQA
+    except ImportError:
+        Cache = MemoryClient    # will use memory

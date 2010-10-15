@@ -185,11 +185,6 @@ class TestWsgiApp(unittest.TestCase):
         self.app = TestApp(app)
         self.app.env = self.env = {'REMOTE_ADDR': '127.0.0.1'}
 
-    def tearDown(self):
-        # flushing 127.0.0.1
-        self.app.app.cache.delete('127.0.0.1')
-        self.app.app.bcache.delete('127.0.0.1')
-
     def test_session(self):
         # we want to send data in a secure channel
         data = {'username': 'bob',
@@ -251,7 +246,7 @@ class TestWsgiApp(unittest.TestCase):
             # memory fallback, bye-bye
             return
 
-        app = self.app.app.app
+        app = self.app.app
         if isinstance(app.cache.cache, MemoryClient):
             return   # TTL is not implemented in the MemoryClient
 
