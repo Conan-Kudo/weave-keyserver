@@ -4,7 +4,7 @@ from hashlib import sha256, sha1
 try:
     import json as simplejson
 except ImportError:
-    import simplejson
+    import simplejson  # NOQA
 
 
 class JPAKEError(Exception):

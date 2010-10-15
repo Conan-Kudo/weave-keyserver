@@ -81,8 +81,7 @@ class User(threading.Thread):
             res = self.app.get(self.curl,
                                extra_environ=self.app.env,
                                headers={'If-None-Match': etag,
-                                        'X-KeyExchange-Id': self.id
-                                   })
+                                        'X-KeyExchange-Id': self.id})
 
             status = res.status_int
             attempts +=1

@@ -113,4 +113,5 @@ except (ImportError, RuntimeError):
     try:
         from memcache import Client as Cache # NOQA
     except ImportError:
-        Cache = MemoryClient    # will use memory
+        # using memory
+        Cache = MemoryClient    # NOQA
