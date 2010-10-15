@@ -228,8 +228,9 @@ def make_app(global_conf, **app_conf):
 
 
     # IP Filtering middleware
-    period = int(app_conf.get('filter_period', '300'))
-    max_calls = int(app_conf.get('max_calls_per_ip', '100'))
-    app = IPFiltering(app, cache, period, max_calls)
+    if global_conf.get('ipfilter', 'false').lower() == 'true':
+        period = int(app_conf.get('filter_period', '300'))
+        max_calls = int(app_conf.get('max_calls_per_ip', '100'))
+        app = IPFiltering(app, cache, period, max_calls)
 
     return app
