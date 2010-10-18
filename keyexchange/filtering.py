@@ -119,8 +119,8 @@ class IPFiltering(object):
         self.br_blacklist_ttl = br_blacklist_ttl
         self.queue_size = queue_size
         self.br_queue_size = br_queue_size
-        self.treshold = treshold
-        self.br_treshold = br_treshold
+        self.treshold = float(treshold)
+        self.br_treshold = float(br_treshold)
         self._last_ips = deque()
         self._last_br_ips = deque()
         # XXX see if we want to keep this in memory or share it in memcached

@@ -14,6 +14,7 @@ all:	build
 
 build:
 	$(VIRTUALENV) --no-site-packages --distribute .
+	$(PYTHON) build.py
 	$(PYTHON) setup.py develop
 	$(EZ) nose
 	$(EZ) WebTest

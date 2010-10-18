@@ -34,7 +34,7 @@
 #
 # ***** END LICENSE BLOCK *****
 """
-J-PAKE server - see https://wiki.mozilla.org/Services/Sync/SyncKey/J-PAKE
+KeyExchange server - see https://wiki.mozilla.org/Services/Sync/SyncKey/J-PAKE
 """
 import datetime
 import re
@@ -49,6 +49,8 @@ from webob.dec import wsgify
 from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
                        HTTPBadRequest)
 
+from synccore.cef import log_failure
+from synccore.util import convert_config, filter_params
 
 from keyexchange.util import (generate_cid, json_response, CID_CHARS,
                               PrefixedCache, Cache)
@@ -59,17 +61,20 @@ _URL = re.compile('/(new_channel|[a-zA-Z0-9]*)/?')
 _CPREFIX = 'keyexchange:'
 _INC_KEY = '%schannel_id' % _CPREFIX
 _NOT_FOUND, _FAILED, _SUCCESS = range(3)
+_DELETE_LOG = 'DeleteLog'
 
 
 class KeyExchangeApp(object):
 
-    def __init__(self, cid_len, cache_servers=None, ttl=300):
-        self.cid_len = cid_len
-        self.max_combos = len(CID_CHARS) ** cid_len
-        self.ttl = ttl
-        if cache_servers is None:
-            cache_servers = ['127.0.0.1:11211']
-        self.cache = PrefixedCache(Cache(cache_servers), _CPREFIX)
+    def __init__(self, config):
+        self.cid_len = config.get('keyexchange.cid_len', 4)
+        self.max_combos = len(CID_CHARS) ** self.cid_len
+        self.ttl = config.get('keyexchange.ttl', 300)
+        servers = config.get('cache_servers', '127.0.0.1:11211')
+        self.cache_servers = [server for server in [server.strip()
+                                             for server in servers.split('\n')]
+                              if server != '']
+        self.cache = PrefixedCache(Cache(self.cache_servers), _CPREFIX)
 
     def _get_new_cid(self, client_id):
         tries = 0
@@ -90,6 +95,7 @@ class KeyExchangeApp(object):
 
     @wsgify
     def __call__(self, request):
+        request.config = self.config
         client_id = request.headers.get('X-KeyExchange-Id')
         method = request.method
         url = request.environ['PATH_INFO']
@@ -203,15 +209,20 @@ class KeyExchangeApp(object):
             raise HTTPNotFound()
         elif res == _FAILED:
             raise HTTPServiceUnavailable()
+
+        # log a message, if any is provided in the X-KeyExchange-Log header
+        log = request.headers.get('X-KeyExchange-Log')
+        if log is not None:
+            log_failure(log, 5, request, signature=_DELETE_LOG)
+
         return json_response('')
 
 
 def make_app(global_conf, **app_conf):
     """Returns a Key Exchange Application."""
-    # XXX Probably want to use the new .ini format instead
-    cid_len = int(app_conf.get('cid_len', '3'))
-    cache = app_conf.get('cache_servers', '127.0.0.1:11211').split(',')
-    app = KeyExchangeApp(cid_len, cache)
+    global_conf.update(app_conf)
+    config = convert_config(global_conf)
+    app = KeyExchangeApp(config)
 
     # hooking a profiler
     if global_conf.get('profile', 'false').lower() == 'true':
@@ -228,9 +239,8 @@ def make_app(global_conf, **app_conf):
 
 
     # IP Filtering middleware
-    if global_conf.get('ipfilter', 'false').lower() == 'true':
-        period = int(app_conf.get('filter_period', '300'))
-        max_calls = int(app_conf.get('max_calls_per_ip', '100'))
-        app = IPFiltering(app, cache, period, max_calls)
+    if config.get('filtering.use', False):
+        del config['filtering.use']
+        app = IPFiltering(app, **filter_params('filtering', config))
 
     return app

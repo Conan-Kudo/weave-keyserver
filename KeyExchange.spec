@@ -40,10 +40,10 @@ python2.6 setup.py build
 %install
 mkdir -p %{buildroot}%{_sysconfdir}/keyexchange
 install -m 0644 etc/keyexchange.wsgi %{buildroot}%{_sysconfdir}/keyexchange/keyexchange.wsgi
-install -m 0644 etc/keyexchange.ini %{buildroot}%{_sysconfdir}/keyexchange/keyexchange.ini
+install -m 0644 etc/production.ini %{buildroot}%{_sysconfdir}/keyexchange/production.ini
 mkdir -p %{buildroot}%{_sysconfdir}/httpd
 mkdir -p %{buildroot}%{_sysconfdir}/httpd/conf.d
-install -m 0644 etc/keyexchange.conf %{buildroot}%{_sysconfdir}/httpd/conf.d/keyexchange.conf
+install -m 0644 etc/keyexchange.apache.conf %{buildroot}%{_sysconfdir}/httpd/conf.d/keyexchange.conf
 mkdir -p %{buildroot}%{_localstatedir}/log
 touch %{buildroot}%{_localstatedir}/log/keyexchange.log
 python2.6 setup.py install --single-version-externally-managed --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES

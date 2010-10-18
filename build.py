@@ -1,4 +1,3 @@
-# -*- coding: utf8 -*-
 # ***** BEGIN LICENSE BLOCK *****
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -35,19 +34,32 @@
 #
 # ***** END LICENSE BLOCK *****
 import os
-from logging.config import fileConfig
-from ConfigParser import NoSectionError
+import sys
 
-# setting up the egg cache to a place where apache can write
-os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
+CURDIR = os.path.dirname(__file__)
+REPO_ROOT = 'https://bitbucket.org/tarek/'
 
-# setting up logging
-ini_file = os.path.join('/etc', 'keyexchange', 'keyexchange.ini')
-try:
-    fileConfig(ini_file)
-except NoSectionError:
-    pass
+def build_deps():
+    """Will make sure dependencies are up-to-date"""
+    location = os.getcwd()
+    try:
+        python = sys.executable
+        deps = os.path.abspath(os.path.join(CURDIR, 'deps'))
+        if not os.path.exists(deps):
+            os.mkdir(deps)
+        for dep in ('sync-core',):
+            repo = REPO_ROOT + dep
+            target = os.path.join(deps, dep)
+            if os.path.exists(target):
+                os.system('hg pull; hg up')
+            else:
+                os.system('hg clone %s %s' % (repo, target))
+            os.chdir(target)
+            os.system('%s setup.py develop' % python)
+    finally:
+        os.chdir(location)
+    os.system('%s setup.py develop' % python)
 
-# running the app using Paste
-from paste.deploy import loadapp
-application = loadapp('config:%s'% ini_file)
+
+if __name__ == '__main__':
+    build_deps()

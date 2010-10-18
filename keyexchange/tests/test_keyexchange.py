@@ -179,6 +179,7 @@ class TestWsgiApp(unittest.TestCase):
 
     def setUp(self):
         app = make_app({})
+        app.config = {}
         # we don't test this here
         app.max_bad_request_calls = 1000
         self.app = TestApp(app)

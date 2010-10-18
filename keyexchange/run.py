@@ -1,3 +1,4 @@
+# -*- coding: utf8 -*-
 # ***** BEGIN LICENSE BLOCK *****
 # Version: MPL 1.1/GPL 2.0/LGPL 2.1
 #
@@ -33,28 +34,24 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-from setuptools import setup, find_packages
-from distutils.command.bdist_rpm import bdist_rpm
-
-entry_points = """
-[paste.app_factory]
-main = keyexchange.wsgiapp:make_app
-
-[paste.app_install]
-main = paste.script.appinstall:Installer
 """
+Runs the Application. This script can be called by any wsgi runner that looks
+for an 'application' variable
+"""
+import os
+from logging.config import fileConfig
+from ConfigParser import NoSectionError
 
-requires = ['WebOb', 'Paste', 'PasteScript', 'repoze.profile', 'SyncCore']
+# setting up the egg cache to a place where apache can write
+os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
 
-class _bdist_rpm(bdist_rpm):
-    def _make_spec_file(self):
-        return open('KeyExchange.spec').read().split('\n')
+# setting up logging
+ini_file = os.path.join('/etc', 'keyexchange', 'paster.ini')
+try:
+    fileConfig(ini_file)
+except NoSectionError:
+    pass
 
-setup(name='KeyExchange', author='Tarek Ziade',
-      url='https://hg.mozilla.org/services/server-key-exchange',
-      description='J-Pake server',
-      long_description=open('README.txt').read(),
-      author_email='tarek@mozilla.com',
-      version=0.1, packages=find_packages(),
-      entry_points=entry_points, install_requires=requires,
-      license='MPL', cmdclass={'bdist_rpm': _bdist_rpm})
+# running the app using Paste
+from paste.deploy import loadapp
+application = loadapp('config:%s'% ini_file)
