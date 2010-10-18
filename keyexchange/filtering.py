@@ -34,61 +34,131 @@
 #
 # ***** END LICENSE BLOCK *****
 """
-IP Filtering middleware.
+IP Filtering middleware. This middleware will:
+
+- Reject all new attempts made by an IP, if this IP already made too many
+  attempts.
+- Reject IPs are are making too many bad requests
+
+To perform this, we keep a LRU of the last N ips in memory and increment the
+calls. If an IP as a high number of calls, it's blaclisted.
+
+For the bad request counter, the same technique is used.
+
+Blacklisted IPs are kept in memcached with a TTL.
 """
 import time
-from webob.exc import HTTPForbidden, HTTPBadRequest
-from keyexchange.util import Cache, PrefixedCache
+from collections import deque as _deque
 
-_CPREFIX = 'keyexchange-ips:'
-_CBADREQ_PREFIX = 'keyexchange-br-ips:'
+from webob.exc import HTTPForbidden, HTTPBadRequest
+
+
+class deque(_deque):
+    def count(self, element):
+        """Python implementation of deque.count() for 2.6.
+        XXX Need to backport the existing 2.7 code to avoid O(n) here
+        """
+        count = 0
+        for _element in self:
+            if _element == element:
+                count += 1
+        return count
+
+
+class Blacklist(set):
+    """Set with TTL.
+
+    XXX need to check for TTL in more API than __contains__
+    """
+    def __init__(self):
+        self._ttls = {}
+
+    def add(self, elmt, ttl=None):
+        set.add(self, elmt)
+        self._ttls[elmt] = time.time() + ttl
+
+    def remove(self, elmt):
+        set.remove(self, elmt)
+        del self._ttls[elmt]
+
+    def __contains__(self, elmt):
+        found = set.__contains__(self, elmt)
+        if found:
+            ttl = self._ttls[elmt]
+            if ttl is None:
+                return True
+            if self._ttls[elmt] - time.time() <= 0:
+                self.remove(elmt)
+                return False
+        return found
+
 
 class IPFiltering(object):
-    """This middleware will:
-
-    - reject all new attempts made by an IP, if this IP already made too
-      many attempts during a certain period.
-
-    - log ips that have issues 400s on the application.
+    """Filtering IPs
     """
-    def __init__(self, app, cache_servers=None, period=300, max_calls=100,
-                 max_bad_request_calls=5, bad_request_period=86400):
+    def __init__(self, app, blacklist_ttl=300, br_blacklist_ttl=86400,
+                 queue_size=1000, br_queue_size=200, treshold=.5,
+                 br_treshold=.5):
+
+        """Initializes the middleware.
+
+        - app: the wsgi application the middleware provides
+        - blacklist_ttl: defines how long in seconds an IP is blacklisted
+        - br_blacklist_ttl: defines how long in seconds an IP that did too many
+          bad requests is blacklisted
+        - queue_size: Size of the queue used to keep track of the last callers
+        - br_queue_size: Size of the queue used to keep track of the last callers
+          that provokated a bad request.
+        - treshold: ratio to mark an IP as an attacker. The ratio is the number
+          of calls the IP made
+        - br_treshold: ratio to mark an IP as an attacker. The ratio is the number
+          of bad requests calls the IP made
+        """
         self.app = app
-        if cache_servers is None:
-            cache_servers = ['127.0.0.1:11211']
-        self.cache = PrefixedCache(Cache(cache_servers), _CPREFIX)
-        self.max_calls = max_calls
-        self.period = period
-        self.max_bad_request_calls = max_bad_request_calls
-        self.bad_request_period = bad_request_period
-        self.bcache = PrefixedCache(Cache(cache_servers), _CBADREQ_PREFIX)
+        self.blacklist_ttl = blacklist_ttl
+        self.br_blacklist_ttl = br_blacklist_ttl
+        self.queue_size = queue_size
+        self.br_queue_size = br_queue_size
+        self.treshold = treshold
+        self.br_treshold = br_treshold
+        self._last_ips = deque()
+        self._last_br_ips = deque()
+        # XXX see if we want to keep this in memory or share it in memcached
+        self._blacklisted = Blacklist()
 
-    def _inc_cache(self, cache, ip, period, count_checker=None):
-        content = cache.get(ip)
-        if content is None:
-            ttl = time.time() + period
-            cache.set(ip, (ttl, 1), time=ttl)
-            return
-        ttl, count = content
-        if count_checker is not None:
-            count_checker(count)
-        cache.set(ip, (ttl, count + 1), time=ttl)
-
-    def _check_counter(self, ip):
-        def _check_count(count):
-            if count >= self.max_calls:
-                # we just reached the treshold
-                raise HTTPForbidden()
-        self._inc_cache(self.cache, ip, self.period, _check_count)
-
-    def _check_bad_reqs(self, ip):
-        content = self.bcache.get(ip)
-        if content is None:
-            return
-        ttl, count = content
-        if count >= self.max_bad_request_calls:
-            # we just reached the treshold
+    def _check_ip(self, ip):
+        # is this IP already blacklisted ?
+        if ip in self._blacklisted:
+            # no, it is blacklisted !
             raise HTTPForbidden()
+
+        # insert the IP in the queue
+        self._last_ips.appendleft(ip)
+
+        # counts its ratio in the queue
+        count = self._last_ips.count(ip)
+        if (count > 0 and
+            float(count) / float(self.queue_size) >= self.treshold):
+            # blacklisting the IP
+            self._blacklisted.add(ip, self.blacklist_ttl)
+
+        # popping the oldest IP if the queue is full
+        if len(self._last_ips) >= self.queue_size:
+            self._last_ips.pop()
+
+    def _inc_bad_request(self, ip):
+        # insert the IP in the br queue
+        self._last_br_ips.insert(0, ip)
+
+        # counts its occurences in the queue
+        count = self._last_br_ips.count(ip)
+        if count > 0 and float(count) / self.br_queue_size >= self.br_treshold:
+            # blacklisting the IP
+            self._blacklisted.add(ip, self.br_blacklist_ttl)
+
+        # poping the oldest IP if the queue is full
+        if len(self._last_br__ips) >= self.br_queue_size:
+            self._last_br_ips.pop()
 
     def __call__(self, environ, start_response):
         # what's the remote ip ?
@@ -97,15 +167,11 @@ class IPFiltering(object):
             # not acceptable
             raise HTTPForbidden()
 
-        # checking for the bad requests this IP have done so far
-        self._check_bad_reqs(ip)
-
-        # checking for the number of attempts for this IP
-        self._check_counter(ip)
-
+        # checking for the IP in our counter
+        self._check_ip(ip)
         try:
             return self.app(environ, start_response)
         except HTTPBadRequest:
             # this IP issued a 400. We want to log that
-            self._inc_cache(self.bcache, ip, self.bad_request_period)
+            self._inc_bad_request(ip)
             raise

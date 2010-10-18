@@ -51,14 +51,10 @@ class FakeApp(object):
 class TestIPFiltering(unittest.TestCase):
 
     def setUp(self):
-        app = IPFiltering(FakeApp(), max_calls=5, period=.5)
+        # this setting will blacklist an IP that does more than 5 calls
+        app = IPFiltering(FakeApp(), queue_size=10, blacklist_ttl=.5,
+                          treshold=.5)
         self.app = TestApp(app)
-        self.mem = isinstance(app.cache.cache, MemoryClient)
-
-    def tearDown(self):
-        # flushing 127.0.0.1
-        self.app.app.cache.delete('127.0.0.1')
-        self.app.app.bcache.delete('127.0.0.1')
 
     def test_reached_max(self):
         env = {'REMOTE_ADDR': '127.0.0.1'}
@@ -78,9 +74,6 @@ class TestIPFiltering(unittest.TestCase):
             self.app.get('/', status=403, extra_environ=env)
         except HTTPForbidden:
             pass
-
-        if self.mem:
-            return
 
         # TTL test - we make the assumption that the beginning of the
         # test took less than 1.5s
