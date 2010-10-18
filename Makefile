@@ -26,10 +26,16 @@ test:
 	$(NOSE) $(TESTS)
 
 bench_one:
-	bin/fl-run-test keyexchange.tests.stress StressTest.test_session -u http://localhost:5000
+	bin/fl-run-test keyexchange.tests.stress StressTest.test_basic_usage -u http://localhost:5000
 
 bench:
-	cd keyexchange/tests; ../../bin/fl-run-bench stress StressTest.test_session -u http://localhost:5000
+	cd keyexchange/tests; ../../bin/fl-run-bench stress StressTest.test_basic_usage -u http://localhost:5000
+
+bench2_one:
+	bin/fl-run-test keyexchange.tests.stress StressTest.test_DoS -u http://localhost:5000
+
+bench2:
+	cd keyexchange/tests; ../../bin/fl-run-bench stress StressTest.test_DoS -u http://localhost:5000
 
 bench_report:
 	bin/fl-build-report --html -o html keyexchange/tests/stress-bench.xml
