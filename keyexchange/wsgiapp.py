@@ -67,6 +67,7 @@ _DELETE_LOG = 'DeleteLog'
 class KeyExchangeApp(object):
 
     def __init__(self, config):
+        self.config = config
         self.cid_len = config.get('keyexchange.cid_len', 4)
         self.max_combos = len(CID_CHARS) ** self.cid_len
         self.ttl = config.get('keyexchange.ttl', 300)
