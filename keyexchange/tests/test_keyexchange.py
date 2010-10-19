@@ -301,3 +301,10 @@ class TestWsgiApp(unittest.TestCase):
         # yes, gone..
         self.app.get(curl, status=404, headers=headers,
                      extra_environ=self.env)
+
+
+    def test_404s(self):
+        # make sure other requests are issuing 404s
+        for url in ('/', '/some/url'):
+            for method in ('get', 'put', 'post', 'delete'):
+                getattr(self.app, method)(url, status=404)
