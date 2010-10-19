@@ -41,54 +41,95 @@ IP Filtering middleware. This middleware will:
 - Reject IPs are are making too many bad requests
 
 To perform this, we keep a LRU of the last N ips in memory and increment the
-calls. If an IP as a high number of calls, it's blaclisted.
+calls. If an IP as a high number of calls, it's blacklisted.
 
 For the bad request counter, the same technique is used.
 
-Blacklisted IPs are kept in memcached with a TTL.
+Blacklisted IPs are kept in memory with a TTL.
 """
 import time
 from collections import deque as _deque
 
 from webob.exc import HTTPForbidden, HTTPBadRequest
 
+from keyexchange.util import Cache
+
 
 class deque(_deque):
     def count(self, element):
         """Python implementation of deque.count() for 2.6.
-        XXX Need to backport the existing 2.7 code to avoid O(n) here
+        XXX The 2.7 code is in C but we don't expect this container to have more
+        that 2k elements.
         """
         count = 0
+        # we need to freeze the sequence while counting, since other threads
+        # might add or remove elements.
         for _element in list(self):
             if _element == element:
                 count += 1
         return count
 
 
-class Blacklist(set):
-    """Set with TTL.
+class Blacklist(object):
+    """IP Blacklist with TTL and memcache support.
 
-    XXX need to check for TTL in more API than __contains__
+    IPs are saved/loaded from Memcached so several apps can share the
+    blacklist.
     """
-    def __init__(self):
+    def __init__(self, cache_server=None):
         self._ttls = {}
+        self._cache_server = cache_server
+        self._set = set()
+        self._dirty = False
+
+    def update(self):
+        """Loads the IP list from memcached."""
+        if self._cache_server is None:
+            return
+        data = self._cache_server.get('keyexchange:blacklist')
+
+        # merging the memcached values
+        if data is not None:
+            _set, ttls = data
+            self._set.union(_set)
+            self._ttls.update(ttls)
+
+        self._dirty = False
+
+    def save(self):
+        """Save the IP into memcached if needed."""
+        if self._cache_server is None or not self._dirty:
+            return
+
+        # doing a CAS to avoid race conditions
+        tries = 0
+        while tries < 10:
+            data = self._set, self._ttls
+            if self._cache_server.cas('keyexchange:blacklist', data):
+                break
+            self.update()  # reload
+            tries += 1
 
     def add(self, elmt, ttl=None):
-        set.add(self, elmt)
+        self._set.add(elmt)
         self._ttls[elmt] = time.time() + ttl
+        self._dirty = True
 
     def remove(self, elmt):
-        set.remove(self, elmt)
+        self._set.remove(elmt)
         del self._ttls[elmt]
+        self._dirty = False
 
     def __contains__(self, elmt):
-        found = set.__contains__(self, elmt)
+        found = elmt in self._set
         if found:
             ttl = self._ttls[elmt]
             if ttl is None:
                 return True
             if self._ttls[elmt] - time.time() <= 0:
-                self.remove(elmt)
+                self._set.remove(elmt)
+                del self._ttls[elmt]
+                self._dirty = True
                 return False
         return found
 
@@ -98,7 +139,7 @@ class IPFiltering(object):
     """
     def __init__(self, app, blacklist_ttl=300, br_blacklist_ttl=86400,
                  queue_size=1000, br_queue_size=200, treshold=.5,
-                 br_treshold=.5):
+                 br_treshold=.5, cache_servers=['127.0.0.0.1:11211']):
 
         """Initializes the middleware.
 
@@ -123,8 +164,10 @@ class IPFiltering(object):
         self.br_treshold = float(br_treshold)
         self._last_ips = deque()
         self._last_br_ips = deque()
-        # XXX see if we want to keep this in memory or share it in memcached
-        self._blacklisted = Blacklist()
+        if isinstance(cache_servers, str):
+            cache_servers = [cache_servers]
+        self._cache_server = Cache(cache_servers)
+        self._blacklisted = Blacklist(self._cache_server)
 
     def _check_ip(self, ip):
         # is this IP already blacklisted ?
@@ -161,17 +204,23 @@ class IPFiltering(object):
             self._last_br_ips.pop()
 
     def __call__(self, environ, start_response):
-        # what's the remote ip ?
-        ip = environ.get('REMOTE_ADDR')
-        if ip is None:
-            # not acceptable
-            raise HTTPForbidden()
-
-        # checking for the IP in our counter
-        self._check_ip(ip)
+        # getting the blacklisted IPs
+        self._blacklisted.update()
         try:
-            return self.app(environ, start_response)
-        except HTTPBadRequest:
-            # this IP issued a 400. We want to log that
-            self._inc_bad_request(ip)
-            raise
+            # what's the remote ip ?
+            ip = environ.get('REMOTE_ADDR')
+            if ip is None:
+                # not acceptable
+                raise HTTPForbidden()
+
+            # checking for the IP in our counter
+            self._check_ip(ip)
+            try:
+                return self.app(environ, start_response)
+            except HTTPBadRequest:
+                # this IP issued a 400. We want to log that
+                self._inc_bad_request(ip)
+                raise
+        finally:
+            # syncing the blacklist
+            self._blacklisted.save()
