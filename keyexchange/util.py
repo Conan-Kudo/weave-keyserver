@@ -100,6 +100,8 @@ class PrefixedCache(object):
     def set(self, key, value, **kw):
         return self.cache.set(self.prefix + key, value, **kw)
 
+    cas = set
+
     def delete(self, key):
         return self.cache.delete(self.prefix + key)
 
