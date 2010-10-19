@@ -71,10 +71,11 @@ class KeyExchangeApp(object):
         self.cid_len = config.get('keyexchange.cid_len', 4)
         self.max_combos = len(CID_CHARS) ** self.cid_len
         self.ttl = config.get('keyexchange.ttl', 300)
-        servers = config.get('cache_servers', '127.0.0.1:11211')
-        self.cache_servers = [server for server in [server.strip()
-                                             for server in servers.split('\n')]
-                              if server != '']
+        servers = config.get('cache_servers', ['127.0.0.1:11211'])
+        if isinstance(servers, str):
+            self.cache_servers = [servers]
+        else:
+            self.cache_servers = servers
         self.cache = PrefixedCache(Cache(self.cache_servers), _CPREFIX)
 
     def _get_new_cid(self, client_id):
