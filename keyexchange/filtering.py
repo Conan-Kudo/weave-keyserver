@@ -59,7 +59,7 @@ class deque(_deque):
         XXX Need to backport the existing 2.7 code to avoid O(n) here
         """
         count = 0
-        for _element in self:
+        for _element in list(self):
             if _element == element:
                 count += 1
         return count
