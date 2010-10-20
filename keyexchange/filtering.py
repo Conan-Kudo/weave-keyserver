@@ -48,6 +48,7 @@ For the bad request counter, the same technique is used.
 Blacklisted IPs are kept in memory with a TTL.
 """
 import time
+import threading
 from collections import deque as _deque
 
 from webob.exc import HTTPForbidden
@@ -83,44 +84,66 @@ class Blacklist(object):
         self._cache_server = cache_server
         self._set = set()
         self._dirty = False
+        self._lock = threading.RLock()
 
     def update(self):
         """Loads the IP list from memcached."""
         if self._cache_server is None:
             return
-        data = self._cache_server.get('keyexchange:blacklist')
 
-        # merging the memcached values
-        if data is not None:
-            _set, ttls = data
-            self._set.union(_set)
-            self._ttls.update(ttls)
+        self._lock.acquire()
+        try:
+            data = self._cache_server.get('keyexchange:blacklist')
 
-        self._dirty = False
+            # merging the memcached values
+            if data is not None:
+                _set, ttls = data
+                # get new blacklisted IP
+                if not self._set.issuperset(_set):
+                    self._set.union(_set)
+                    self._ttls.update(ttls)
+        finally:
+            self._lock.release()
 
     def save(self):
         """Save the IP into memcached if needed."""
         if self._cache_server is None or not self._dirty:
             return
 
-        # doing a CAS to avoid race conditions
-        tries = 0
-        while tries < 10:
-            data = self._set, self._ttls
-            if self._cache_server.cas('keyexchange:blacklist', data):
-                break
-            self.update()  # reload
-            tries += 1
+        self._lock.acquire()
+        try:
+            # doing a CAS to avoid race conditions
+            tries = 0
+            while tries < 10:
+                data = self._set, self._ttls
+                if self._cache_server.cas('keyexchange:blacklist', data):
+                    self._dirty = False
+                    break
+                self.update()  # reload
+                tries += 1
+        finally:
+            self._lock.release()
 
     def add(self, elmt, ttl=None):
-        self._set.add(elmt)
-        self._ttls[elmt] = time.time() + ttl
-        self._dirty = True
+        self._lock.acquire()
+        try:
+            self._set.add(elmt)
+            if ttl is not None:
+                self._ttls[elmt] = time.time() + ttl
+            else:
+                self._ttls[elmt] = None
+            self._dirty = True
+        finally:
+            self._lock.release()
 
     def remove(self, elmt):
-        self._set.remove(elmt)
-        del self._ttls[elmt]
-        self._dirty = True
+        self._lock.acquire()
+        try:
+            self._set.remove(elmt)
+            del self._ttls[elmt]
+            self._dirty = True
+        finally:
+            self._lock.release()
 
     def __contains__(self, elmt):
         found = elmt in self._set
@@ -132,6 +155,9 @@ class Blacklist(object):
                 self.remove(elmt)
                 return False
         return found
+
+    def __len__(self):
+        return len(self._set)
 
 
 class IPFiltering(object):

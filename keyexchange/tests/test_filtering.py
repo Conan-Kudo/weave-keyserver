@@ -35,8 +35,12 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 import time
+import threading
+import random
 
-from keyexchange.filtering import IPFiltering
+from keyexchange.filtering import IPFiltering, Blacklist
+from keyexchange.util import MemoryClient
+
 from webtest import TestApp, AppError
 from webob.exc import HTTPForbidden, HTTPBadRequest
 
@@ -135,3 +139,42 @@ class TestIPFiltering(unittest.TestCase):
 
         # let's see how's the queue is doing
         self.assertEqual(len(app._last_br_ips), 3)
+
+    def test_blacklist_thread_safe(self):
+        # testing the thread-safeness of Blacklist
+        cache = MemoryClient(None)
+        blacklist = Blacklist(cache)
+
+        class Worker(threading.Thread):
+            def __init__(self, name, blacklist):
+                self.blacklist = blacklist
+                threading.Thread.__init__(self)
+
+            def run(self):
+                # we want to:
+                #   - load the list
+                #   - add 10 elements
+                #   - remove 1
+                #   - save the list
+                self.blacklist.update()
+
+                for i in range(10):
+                    self.blacklist.add(self.name + str(i))
+
+                # remove a random element
+                ips = list(self.blacklist._set)
+                self.blacklist.remove(random.choice(ips))
+
+                # save the list
+                self.blacklist.save()
+
+        workers = [Worker(str(i), blacklist) for i in range(10)]
+        for worker in workers:
+            worker.start()
+
+        for worker in workers:
+            worker.join()
+
+        # we should have 90 elements
+        self.assertEqual(len(blacklist), 90)
+        self.assertFalse(blacklist._dirty)
