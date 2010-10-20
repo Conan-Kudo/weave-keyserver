@@ -54,7 +54,7 @@ from webob.exc import HTTPForbidden
 from keyexchange.util import Cache
 
 # Make sure we get the IP from any proxy or loadbalancer, if any is used
-_IP_HEADERS = ('X-Forwarded-For', 'X_FORWADED_FOR', 'REMOTE_ADDR')
+_IP_HEADERS = ('X-Forwarded-For', 'X_FORWARDED_FOR', 'REMOTE_ADDR')
 
 
 class deque(_deque):
