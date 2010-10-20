@@ -186,7 +186,7 @@ class IPFiltering(object):
             self._blacklisted.add(ip, self.blacklist_ttl)
 
         # popping the oldest IP if the queue is full
-        if len(self._last_ips) >= self.queue_size:
+        if len(self._last_ips) > self.queue_size:
             self._last_ips.pop()
 
     def _inc_bad_request(self, ip):
@@ -200,12 +200,18 @@ class IPFiltering(object):
             self._blacklisted.add(ip, self.br_blacklist_ttl)
 
         # poping the oldest IP if the queue is full
-        if len(self._last_br_ips) >= self.br_queue_size:
+        if len(self._last_br_ips) > self.br_queue_size:
             self._last_br_ips.pop()
 
     def __call__(self, environ, start_response):
         # getting the blacklisted IPs
         self._blacklisted.update()
+        start_response_status = []
+
+        def _start_response(status, headers):
+            start_response_status.append(status)
+            return start_response(status, headers)
+
         try:
             # what's the remote ip ?
             for header in _IP_HEADERS:
@@ -220,8 +226,9 @@ class IPFiltering(object):
             # checking for the IP in our counter
             self._check_ip(ip)
 
-            res = self.app(environ, start_response)
-            if len(res) > 0 and '400 Bad Request' in res[0]:
+            res = self.app(environ, _start_response)
+
+            if start_response_status[0].startswith('400'):
                 # this IP issued a 400. We want to log that
                 self._inc_bad_request(ip)
 
