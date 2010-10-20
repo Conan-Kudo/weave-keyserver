@@ -53,6 +53,9 @@ from collections import deque as _deque
 from webob.exc import HTTPForbidden
 from keyexchange.util import Cache
 
+# Make sure we get the IP from any proxy or loadbalancer, if any is used
+_IP_HEADERS = ('X-Forwarded-For', 'X_FORWADED_FOR', 'REMOTE_ADDR')
+
 
 class deque(_deque):
     def count(self, element):
@@ -205,7 +208,11 @@ class IPFiltering(object):
         self._blacklisted.update()
         try:
             # what's the remote ip ?
-            ip = environ.get('REMOTE_ADDR')
+            for header in _IP_HEADERS:
+                ip = environ.get(header)
+                if ip is not None:
+                    break
+
             if ip is None:
                 # not acceptable
                 raise HTTPForbidden()
