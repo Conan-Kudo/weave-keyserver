@@ -58,8 +58,8 @@ from keyexchange.util import Cache
 class deque(_deque):
     def count(self, element):
         """Python implementation of deque.count() for 2.6.
-        XXX The 2.7 code is in C but we don't expect this container to have more
-        that 2k elements.
+        XXX The 2.7 code is in C but we don't expect this container to have
+        more that 2k elements.
         """
         count = 0
         # we need to freeze the sequence while counting, since other threads
@@ -148,12 +148,12 @@ class IPFiltering(object):
         - br_blacklist_ttl: defines how long in seconds an IP that did too many
           bad requests is blacklisted
         - queue_size: Size of the queue used to keep track of the last callers
-        - br_queue_size: Size of the queue used to keep track of the last callers
-          that provokated a bad request.
+        - br_queue_size: Size of the queue used to keep track of the last
+          callers that provokated a bad request.
         - treshold: ratio to mark an IP as an attacker. The ratio is the number
           of calls the IP made
-        - br_treshold: ratio to mark an IP as an attacker. The ratio is the number
-          of bad requests calls the IP made
+        - br_treshold: ratio to mark an IP as an attacker. The ratio is the
+          number of bad requests calls the IP made
         """
         self.app = app
         self.blacklist_ttl = blacklist_ttl

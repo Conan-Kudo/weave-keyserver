@@ -239,7 +239,6 @@ def make_app(global_conf, **app_conf):
         app = TransLogger(app, logger_name='jpakeapp',
                           setup_console_handler=True)
 
-
     # IP Filtering middleware
     if config.get('filtering.use', False):
         del config['filtering.use']

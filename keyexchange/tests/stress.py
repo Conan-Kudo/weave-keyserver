@@ -39,10 +39,9 @@ Load test for the J-Pake server
 import random
 import json
 import unittest
-import time
 import hashlib
 
-from keyexchange.tests import _patch
+from keyexchange.tests import _patch   # NOQA
 
 from funkload.FunkLoadTestCase import FunkLoadTestCase
 from funkload.utils import Data

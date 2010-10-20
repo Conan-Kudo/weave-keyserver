@@ -37,7 +37,6 @@ import unittest
 import time
 
 from keyexchange.filtering import IPFiltering
-from keyexchange.util import MemoryClient
 from webtest import TestApp
 from webob.exc import HTTPForbidden
 
