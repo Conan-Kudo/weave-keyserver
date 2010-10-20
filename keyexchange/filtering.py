@@ -50,8 +50,7 @@ Blacklisted IPs are kept in memory with a TTL.
 import time
 from collections import deque as _deque
 
-from webob.exc import HTTPForbidden, HTTPBadRequest
-
+from webob.exc import HTTPForbidden
 from keyexchange.util import Cache
 
 
@@ -189,7 +188,7 @@ class IPFiltering(object):
 
     def _inc_bad_request(self, ip):
         # insert the IP in the br queue
-        self._last_br_ips.insert(0, ip)
+        self._last_br_ips.appendleft(ip)
 
         # counts its occurences in the queue
         count = self._last_br_ips.count(ip)
@@ -198,7 +197,7 @@ class IPFiltering(object):
             self._blacklisted.add(ip, self.br_blacklist_ttl)
 
         # poping the oldest IP if the queue is full
-        if len(self._last_br__ips) >= self.br_queue_size:
+        if len(self._last_br_ips) >= self.br_queue_size:
             self._last_br_ips.pop()
 
     def __call__(self, environ, start_response):
@@ -213,12 +212,13 @@ class IPFiltering(object):
 
             # checking for the IP in our counter
             self._check_ip(ip)
-            try:
-                return self.app(environ, start_response)
-            except HTTPBadRequest:
+
+            res = self.app(environ, start_response)
+            if len(res) > 0 and '400 Bad Request' in res[0]:
                 # this IP issued a 400. We want to log that
                 self._inc_bad_request(ip)
-                raise
+
+            return res
         finally:
             # syncing the blacklist
             self._blacklisted.save()
