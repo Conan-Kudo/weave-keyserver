@@ -118,7 +118,7 @@ class Blacklist(object):
     def remove(self, elmt):
         self._set.remove(elmt)
         del self._ttls[elmt]
-        self._dirty = False
+        self._dirty = True
 
     def __contains__(self, elmt):
         found = elmt in self._set
@@ -127,9 +127,7 @@ class Blacklist(object):
             if ttl is None:
                 return True
             if self._ttls[elmt] - time.time() <= 0:
-                self._set.remove(elmt)
-                del self._ttls[elmt]
-                self._dirty = True
+                self.remove(elmt)
                 return False
         return found
 
