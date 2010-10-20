@@ -46,7 +46,7 @@ from ConfigParser import NoSectionError
 os.environ['PYTHON_EGG_CACHE'] = '/tmp/python-eggs'
 
 # setting up logging
-ini_file = os.path.join('/etc', 'keyexchange', 'paster.ini')
+ini_file = os.path.join('/etc', 'keyexchange', 'production.ini')
 try:
     fileConfig(ini_file)
 except NoSectionError:

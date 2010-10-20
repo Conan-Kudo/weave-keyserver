@@ -41,13 +41,16 @@ import json
 import time
 import random
 import hashlib
+import os
 
 from webtest import TestApp
+from paste.deploy import loadapp
 
 from keyexchange.tests.client import JPAKE
 from keyexchange.wsgiapp import make_app
 from keyexchange.util import MemoryClient
 
+HERE = os.path.dirname(__file__)
 
 class User(threading.Thread):
 
@@ -178,10 +181,11 @@ class Receiver(User):
 class TestWsgiApp(unittest.TestCase):
 
     def setUp(self):
-        app = make_app({})
-        app.config = {}
+        ini_file = os.path.join(HERE, '..', '..', 'etc',
+                                'tests.ini')
+        app = loadapp('config:%s' % ini_file)
         # we don't test this here
-        app.max_bad_request_calls = 1000
+        app.max_bad_request_calls = 100000
         self.app = TestApp(app)
         self.app.env = self.env = {'REMOTE_ADDR': '127.0.0.1'}
 
@@ -219,6 +223,12 @@ class TestWsgiApp(unittest.TestCase):
         received_data.sort()
         self.assertEqual(original_data, received_data)
 
+    def _get_app(self):
+        app = self
+        while hasattr(app, 'app'):
+            app = app.app
+        return app
+
     def test_behavior(self):
         headers = {'X-KeyExchange-Id': 'b' * 256}
 
@@ -242,11 +252,12 @@ class TestWsgiApp(unittest.TestCase):
                      extra_environ=self.env)
 
         # let's try a really small ttl to make sure it works
-        if isinstance(self.app.app.cache, dict):
+        app = self._get_app()
+
+        if isinstance(app.cache, dict):
             # memory fallback, bye-bye
             return
 
-        app = self.app.app
         if isinstance(app.cache.cache, MemoryClient):
             return   # TTL is not implemented in the MemoryClient
 
@@ -302,9 +313,34 @@ class TestWsgiApp(unittest.TestCase):
         self.app.get(curl, status=404, headers=headers,
                      extra_environ=self.env)
 
-
     def test_404s(self):
         # make sure other requests are issuing 404s
         for url in ('/', '/some/url', '/UPER'):
             for method in ('get', 'put', 'post', 'delete'):
-                getattr(self.app, method)(url, status=404)
+                getattr(self.app, method)(url, status=404,
+                                          extra_environ=self.env)
+
+    def test_cef_logger(self):
+        # creating a channel
+        headers = {'X-KeyExchange-Id': 'b' * 256}
+        res = self.app.get('/new_channel', headers=headers,
+                           extra_environ=self.env)
+        cid = str(json.loads(res.body))
+        curl = '/%s' % cid
+        logs = []
+
+        def _counter(log, *args, **kw):
+            logs.append(log)
+
+        # let's delete it with a log message
+        from keyexchange import wsgiapp
+        old = wsgiapp.log_failure
+        wsgiapp.log_failure = _counter
+        try:
+            headers['X-KeyExchange-Log'] = 'my log'
+            self.app.delete(curl, headers=headers,
+                            extra_environ=self.env)
+        finally:
+            wsgiapp.log_failure = old
+
+        self.assertEqual(logs[0], 'my log')
