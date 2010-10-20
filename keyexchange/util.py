@@ -69,6 +69,8 @@ class MemoryClient(dict):
         self[key] = value
         return True
 
+    cas = set
+
     def add(self, key, value, time=0):
         if key in self:
             return False
@@ -98,8 +100,6 @@ class PrefixedCache(object):
 
     def set(self, key, value, **kw):
         return self.cache.set(self.prefix + key, value, **kw)
-
-    cas = set
 
     def delete(self, key):
         return self.cache.delete(self.prefix + key)
