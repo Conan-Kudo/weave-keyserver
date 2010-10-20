@@ -313,6 +313,34 @@ class TestWsgiApp(unittest.TestCase):
         self.app.get(curl, status=404, headers=headers,
                      extra_environ=self.env)
 
+        #
+        # Testing with a bad id size
+        #
+        # an id with the right size does the job
+        headers = {'X-KeyExchange-Id': 'b' * 256}
+        res = self.app.get('/new_channel', headers=headers,
+                           extra_environ=self.env)
+        cid = str(json.loads(res.body))
+
+        # then we can put stuff as usual in the channel
+        curl = '/%s' % cid
+        self.app.put(curl, params='somedata', headers=headers,
+                     status=200, extra_environ=self.env)
+
+        # another id is used on the other side
+        headers2 = {'X-KeyExchange-Id': 'c' * 256}
+        self.app.get(curl,  headers=headers2, status=200,
+                     extra_environ=self.env)
+
+        # try to get the data with a wrong id and it's gone
+        headers2 = {'X-KeyExchange-Id': 'e' * 255}
+        self.app.get(curl,  headers=headers2, status=400,
+                     extra_environ=self.env)
+
+        # yes, gone..
+        self.app.get(curl, status=404, headers=headers,
+                     extra_environ=self.env)
+
     def test_404s(self):
         # make sure other requests are issuing 404s
         for url in ('/', '/some/url', '/UPER'):
