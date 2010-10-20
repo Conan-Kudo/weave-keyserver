@@ -41,7 +41,6 @@ import random
 
 from webob import Response
 
-
 CID_CHARS = string.digits + string.lowercase
 
 

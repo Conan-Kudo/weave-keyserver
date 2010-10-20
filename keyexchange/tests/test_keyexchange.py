@@ -305,6 +305,6 @@ class TestWsgiApp(unittest.TestCase):
 
     def test_404s(self):
         # make sure other requests are issuing 404s
-        for url in ('/', '/some/url'):
+        for url in ('/', '/some/url', '/UPER'):
             for method in ('get', 'put', 'post', 'delete'):
                 getattr(self.app, method)(url, status=404)

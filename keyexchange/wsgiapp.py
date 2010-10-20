@@ -57,7 +57,7 @@ from keyexchange.util import (generate_cid, json_response, CID_CHARS,
 from keyexchange.filtering import IPFiltering
 
 
-_URL = re.compile('^/(new_channel|[a-zA-Z0-9]+)/?$')
+_URL = re.compile('^/(new_channel|[%s]+)/?$' % CID_CHARS)
 _CPREFIX = 'keyexchange:'
 _INC_KEY = '%schannel_id' % _CPREFIX
 _NOT_FOUND, _FAILED, _SUCCESS = range(3)
