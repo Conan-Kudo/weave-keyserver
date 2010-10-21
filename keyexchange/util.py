@@ -43,6 +43,8 @@ from webob import Response
 
 CID_CHARS = string.digits + string.lowercase
 
+# initialize the random seed. This will use os.urandom()
+random.seed()
 
 def json_response(data, dump=True, **kw):
     """Returns Response containing a json string"""
