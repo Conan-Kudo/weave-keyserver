@@ -42,7 +42,7 @@ from keyexchange.filtering import IPFiltering, Blacklist
 from keyexchange.util import MemoryClient
 
 from webtest import TestApp, AppError
-from webob.exc import HTTPForbidden, HTTPBadRequest
+from webob.exc import HTTPForbidden
 
 
 class FakeApp(object):

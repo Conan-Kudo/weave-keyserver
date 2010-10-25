@@ -73,28 +73,51 @@ class deque(_deque):
         return count
 
 
+class _Syncer(threading.Thread):
+
+    def __init__(self, blacklist, frequency=5):
+        threading.Thread.__init__(self)
+        self.blacklist = blacklist
+        self.frequency = frequency
+        self.running = False
+
+    def run(self):
+        self.running = True
+        while self.running:
+            # this syncs the blacklist
+            self.blacklist.save()
+            time.sleep(self.frequency)
+
+    def join(self):
+        if not self.running:
+            return
+        self.running = False
+        threading.Thread.join(self)
+
+
 class Blacklist(object):
     """IP Blacklist with TTL and memcache support.
 
     IPs are saved/loaded from Memcached so several apps can share the
     blacklist.
     """
-    def __init__(self, cache_server=None):
+    def __init__(self, cache_server=None, frequency=5):
         self._ttls = {}
         self._cache_server = cache_server
         self._ips = set()
         self._dirty = False
         self._lock = threading.RLock()
+        self._syncer = _Syncer(self, frequency=frequency)
+        # sys.exit() call all threads join() in >= 2.6.5
+        self._syncer.start()
 
     def update(self):
         """Loads the IP list from memcached."""
         if self._cache_server is None:
             return
-
         self._lock.acquire()
         try:
             data = self._cache_server.get('keyexchange:blacklist')
-
             # merging the memcached values
             if data is not None:
                 ips, ttls = data
@@ -160,7 +183,7 @@ class Blacklist(object):
                     return False
             return found
         finally:
-             self._lock.release()
+            self._lock.release()
 
     def __len__(self):
         return len(self._ips)
@@ -172,7 +195,7 @@ class IPFiltering(object):
     def __init__(self, app, blacklist_ttl=300, br_blacklist_ttl=86400,
                  queue_size=1000, br_queue_size=200, treshold=.5,
                  br_treshold=.5, cache_servers=['127.0.0.0.1:11211'],
-                 use_memory=False):
+                 use_memory=False, refresh_frequency=1):
 
         """Initializes the middleware.
 
@@ -200,7 +223,7 @@ class IPFiltering(object):
         if isinstance(cache_servers, str):
             cache_servers = [cache_servers]
         self._cache_server = get_memcache_class(use_memory)(cache_servers)
-        self._blacklisted = Blacklist(self._cache_server)
+        self._blacklisted = Blacklist(self._cache_server, refresh_frequency)
 
     def _check_ip(self, ip):
         # is this IP already blacklisted ?
@@ -231,35 +254,29 @@ class IPFiltering(object):
             self._blacklisted.add(ip, self.br_blacklist_ttl)
 
     def __call__(self, environ, start_response):
-        # getting the blacklisted IPs
-        self._blacklisted.update()
         start_response_status = []
 
         def _start_response(status, headers, exc_info=None):
             start_response_status.append(status)
             return start_response(status, headers, exc_info)
 
-        try:
-            # what's the remote ip ?
-            for header in _IP_HEADERS:
-                ip = environ.get(header)
-                if ip is not None:
-                    break
+        # what's the remote ip ?
+        for header in _IP_HEADERS:
+            ip = environ.get(header)
+            if ip is not None:
+                break
 
-            if ip is None:
-                # not acceptable
-                raise HTTPForbidden()
+        if ip is None:
+            # not acceptable
+            raise HTTPForbidden()
 
-            # checking for the IP in our counter
-            self._check_ip(ip)
+        # checking for the IP in our counter
+        self._check_ip(ip)
 
-            res = self.app(environ, _start_response)
+        res = self.app(environ, _start_response)
 
-            if start_response_status[0].startswith('400'):
-                # this IP issued a 400. We want to log that
-                self._inc_bad_request(ip)
+        if start_response_status[0].startswith('400'):
+            # this IP issued a 400. We want to log that
+            self._inc_bad_request(ip)
 
-            return res
-        finally:
-            # syncing the blacklist
-            self._blacklisted.save()
+        return res

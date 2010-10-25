@@ -47,7 +47,6 @@ from webtest import TestApp
 from paste.deploy import loadapp
 
 from keyexchange.tests.client import JPAKE
-from keyexchange.wsgiapp import make_app
 from keyexchange.util import MemoryClient
 
 HERE = os.path.dirname(__file__)
