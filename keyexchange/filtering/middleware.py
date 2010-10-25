@@ -143,6 +143,7 @@ class IPFiltering(object):
 
         This page is not activated by default.
         """
+        import pdb; pdb.set_trace()
         headers = [('Content-Type', 'text/html')]
         start_response('200 OK', headers)
         # we want to display the list of blacklisted IPs
@@ -169,7 +170,7 @@ class IPFiltering(object):
         if ip is None or ip in self._blacklisted:
             # returning a 403
             headers = [('Content-Type', 'text/plain')]
-            start_response('403 Forbidden', headers, sys.exc_info())
+            start_response('403 Forbidden', headers)
             return ["Forbidden: You don't have permission to access"]
 
         # checking for the IP in our counter
