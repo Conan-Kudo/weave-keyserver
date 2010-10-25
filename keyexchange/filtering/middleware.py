@@ -48,6 +48,7 @@ For the bad request counter, the same technique is used.
 Blacklisted IPs are kept in memory with a TTL.
 """
 import os
+import cgi
 from collections import deque as _deque
 
 from mako.template import Template
@@ -143,11 +144,22 @@ class IPFiltering(object):
 
         This page is not activated by default.
         """
-        import pdb; pdb.set_trace()
+        post_env = environ.copy()
+        post_env['QUERY_STRING'] = ''
+        post = cgi.FieldStorage(fp=environ['wsgi.input'], environ=post_env,
+                                keep_blank_values=True)
+        ips = [ip for ip in post.keys() if post[ip].value == 'on']
+        for ip in ips:
+            try:
+                self._blacklisted.remove(ip)
+            except KeyError:
+                pass
+
         headers = [('Content-Type', 'text/html')]
         start_response('200 OK', headers)
         # we want to display the list of blacklisted IPs
-        return [self._admin_tpl.render(ips=self._blacklisted.ips)]
+        return [self._admin_tpl.render(ips=self._blacklisted.ips,
+                                       admin_page=self.admin_page)]
 
     def __call__(self, environ, start_response):
         # is it an admin call ?

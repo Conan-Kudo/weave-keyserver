@@ -200,3 +200,11 @@ class TestIPFiltering(unittest.TestCase):
         # and the admin page should display the IP
         res = self.app.get('/__admin__')
         self.assertTrue('myip' in res.body)
+
+        # let's remove the IP from the blacklist
+        res.form['myip'].checked = True
+        res.form.submit()
+
+        # and the IP should be gone
+        res = self.app.get('/__admin__')
+        self.assertTrue('myip' not in res.body)
