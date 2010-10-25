@@ -49,7 +49,7 @@ Blacklisted IPs are kept in memory with a TTL.
 """
 import os
 import cgi
-from collections import deque as _deque
+from collections import deque
 
 from mako.template import Template
 
@@ -60,27 +60,50 @@ from keyexchange.filtering.blacklist import Blacklist
 _IP_HEADERS = ('X-Forwarded-For', 'X_FORWARDED_FOR', 'REMOTE_ADDR')
 
 
-class deque(_deque):
-    def count(self, element):
-        """Python implementation of deque.count() for 2.6.
-        XXX The 2.7 code is in C but we don't expect this container to have
-        more that 2k elements.
-        """
-        count = 0
-        # we need to freeze the sequence while counting, since other threads
-        # might add or remove elements.
-        for _element in list(self):
-            if _element == element:
-                count += 1
-        return count
+class IPQueue(deque):
+    """IP Queue that keeps a counter for each IP.
+
+    When an IP comes in, it's append in the left and the counter
+    initialized to 1.
+
+    If the IP is already in the queue, its counter is incremented,
+    and it's moved back to the left.
+
+    When the queue is full, the right element is discarded.
+    """
+    def __init__(self, maxlen=200):
+        self._ips = deque()
+        self._counter = dict()
+        self._maxlen = maxlen
+
+    def append(self, ip):
+        """Adds the IP and raise the counter accordingly."""
+        if ip not in self._ips:
+            self._ips.appendleft(ip)
+            self._counter[ip] = 1
+        else:
+            self._ips.remove(ip)
+            self._ips.appendleft(ip)
+            self._counter[ip] += 1
+
+        if len(self._ips) > self._maxlen:
+            ip = self._ips.pop()
+            del self._counter[ip]
+
+    def count(self, ip):
+        """Returns the IP count."""
+        return self._counter.get(ip, 0)
+
+    def __len__(self):
+        return len(self._ips)
 
 
 class IPFiltering(object):
     """Filtering IPs
     """
     def __init__(self, app, blacklist_ttl=300, br_blacklist_ttl=86400,
-                 queue_size=1000, br_queue_size=200, treshold=.5,
-                 br_treshold=.5, cache_servers=['127.0.0.0.1:11211'],
+                 queue_size=200, br_queue_size=20, treshold=20,
+                 br_treshold=5, cache_servers=['127.0.0.0.1:11211'],
                  admin_page=None, use_memory=False, refresh_frequency=1):
 
         """Initializes the middleware.
@@ -92,20 +115,18 @@ class IPFiltering(object):
         - queue_size: Size of the queue used to keep track of the last callers
         - br_queue_size: Size of the queue used to keep track of the last
           callers that provokated a bad request.
-        - treshold: ratio to mark an IP as an attacker. The ratio is the number
-          of calls the IP made
-        - br_treshold: ratio to mark an IP as an attacker. The ratio is the
-          number of bad requests calls the IP made
+        - treshold: max number of calls per IP before we blacklist it.
+        - br_treshold: max number of bad request per IP before we blacklist it.
         """
         self.app = app
         self.blacklist_ttl = blacklist_ttl
         self.br_blacklist_ttl = br_blacklist_ttl
         self.queue_size = queue_size
         self.br_queue_size = br_queue_size
-        self.treshold = float(treshold)
-        self.br_treshold = float(br_treshold)
-        self._last_ips = deque(maxlen=queue_size)
-        self._last_br_ips = deque(maxlen=br_queue_size)
+        self.treshold = treshold
+        self.br_treshold = br_treshold
+        self._last_ips = IPQueue(queue_size)
+        self._last_br_ips = IPQueue(br_queue_size)
         if isinstance(cache_servers, str):
             cache_servers = [cache_servers]
         self._cache_server = get_memcache_class(use_memory)(cache_servers)
@@ -119,23 +140,20 @@ class IPFiltering(object):
     def _check_ip(self, ip):
         # insert the IP in the queue
         # if the queue is full, the opposite-end item is discarded
-        self._last_ips.appendleft(ip)
+        self._last_ips.append(ip)
 
         # counts its ratio in the queue
-        count = self._last_ips.count(ip)
-        if (count > 0 and
-            float(count) / float(self.queue_size) >= self.treshold):
+        if self._last_ips.count(ip) >= self.treshold:
             # blacklisting the IP
             self._blacklisted.add(ip, self.blacklist_ttl)
 
     def _inc_bad_request(self, ip):
         # insert the IP in the br queue
         # if the queue is full, the opposite-end item is discarded
-        self._last_br_ips.appendleft(ip)
+        self._last_br_ips.append(ip)
 
         # counts its occurences in the queue
-        count = self._last_br_ips.count(ip)
-        if count > 0 and float(count) / self.br_queue_size >= self.br_treshold:
+        if self._last_br_ips.count(ip) >= self.br_treshold:
             # blacklisting the IP
             self._blacklisted.add(ip, self.br_blacklist_ttl)
 

@@ -63,7 +63,7 @@ class TestIPFiltering(unittest.TestCase):
     def setUp(self):
         # this setting will blacklist an IP that does more than 5 calls
         app = IPFiltering(FakeApp(), queue_size=10, blacklist_ttl=.5,
-                          treshold=.5, br_queue_size=3,
+                          treshold=5, br_queue_size=3,
                           br_blacklist_ttl=.5, use_memory=True)
         self.app = TestApp(app)
 
@@ -95,13 +95,13 @@ class TestIPFiltering(unittest.TestCase):
 
 
     def test_reached_br_max(self):
-        env = {'REMOTE_ADDR': '127.0.0.3'}
+        self.app.app.br_treshold = 3
+        env = {'REMOTE_ADDR': '127.0.0.1'}
 
-        # doing 2 calls
-        for i in range(2):
+        # doing 3 calls
+        for i in range(3):
             self.assertRaises(AppError, self.app.get, '/boo', status=200,
                               extra_environ=env)
-
 
         # the next call should be rejected
         try:
@@ -118,11 +118,11 @@ class TestIPFiltering(unittest.TestCase):
 
     def test_basics(self):
         app = self.app.app
-        app.br_treshold = app.treshold = 1.1
-        env = {'REMOTE_ADDR': '127.0.0.1'}
+        app.br_treshold = app.treshold = 100000
 
         # saturating the queue now to make sure its LRU-ing right
         for i in range(15):
+            env = {'REMOTE_ADDR': str(i)}
             try:
                 self.app.get('/', extra_environ=env)
             except HTTPForbidden:
@@ -132,6 +132,7 @@ class TestIPFiltering(unittest.TestCase):
         env = {'REMOTE_ADDR': '127.0.0.2'}
 
         for i in range(15):
+            env = {'REMOTE_ADDR': str(i)}
             try:
                 self.app.get('/boo', extra_environ=env)
             except (AppError, HTTPForbidden):
