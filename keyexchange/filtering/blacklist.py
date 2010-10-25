@@ -49,28 +49,6 @@ Blacklisted IPs are kept in memory with a TTL.
 """
 import time
 import threading
-from collections import deque as _deque
-
-from webob.exc import HTTPForbidden
-from keyexchange.util import get_memcache_class
-
-# Make sure we get the IP from any proxy or loadbalancer, if any is used
-_IP_HEADERS = ('X-Forwarded-For', 'X_FORWARDED_FOR', 'REMOTE_ADDR')
-
-
-class deque(_deque):
-    def count(self, element):
-        """Python implementation of deque.count() for 2.6.
-        XXX The 2.7 code is in C but we don't expect this container to have
-        more that 2k elements.
-        """
-        count = 0
-        # we need to freeze the sequence while counting, since other threads
-        # might add or remove elements.
-        for _element in list(self):
-            if _element == element:
-                count += 1
-        return count
 
 
 class _Syncer(threading.Thread):
@@ -104,7 +82,7 @@ class Blacklist(object):
     def __init__(self, cache_server=None, frequency=5):
         self._ttls = {}
         self._cache_server = cache_server
-        self._ips = set()
+        self.ips = set()
         self._dirty = False
         self._lock = threading.RLock()
         self._syncer = _Syncer(self, frequency=frequency)
@@ -122,8 +100,8 @@ class Blacklist(object):
             if data is not None:
                 ips, ttls = data
                 # get new blacklisted IP
-                if not self._ips.issuperset(ips):
-                    self._ips.union(ips)
+                if not self.ips.issuperset(ips):
+                    self.ips.union(ips)
                     self._ttls.update(ttls)
         finally:
             self._lock.release()
@@ -138,7 +116,7 @@ class Blacklist(object):
             # doing a CAS to avoid race conditions
             tries = 0
             while tries < 10:
-                data = self._ips, self._ttls
+                data = self.ips, self._ttls
                 if self._cache_server.cas('keyexchange:blacklist', data):
                     self._dirty = False
                     break
@@ -150,7 +128,7 @@ class Blacklist(object):
     def add(self, elmt, ttl=None):
         self._lock.acquire()
         try:
-            self._ips.add(elmt)
+            self.ips.add(elmt)
             if ttl is not None:
                 self._ttls[elmt] = time.time() + ttl
             else:
@@ -162,7 +140,7 @@ class Blacklist(object):
     def remove(self, elmt):
         self._lock.acquire()
         try:
-            self._ips.remove(elmt)
+            self.ips.remove(elmt)
             del self._ttls[elmt]
             self._dirty = True
         finally:
@@ -171,7 +149,7 @@ class Blacklist(object):
     def __contains__(self, elmt):
         self._lock.acquire()
         try:
-            found = elmt in self._ips
+            found = elmt in self.ips
             if found:
                 ttl = self._ttls[elmt]
                 if ttl is None:
@@ -186,97 +164,4 @@ class Blacklist(object):
             self._lock.release()
 
     def __len__(self):
-        return len(self._ips)
-
-
-class IPFiltering(object):
-    """Filtering IPs
-    """
-    def __init__(self, app, blacklist_ttl=300, br_blacklist_ttl=86400,
-                 queue_size=1000, br_queue_size=200, treshold=.5,
-                 br_treshold=.5, cache_servers=['127.0.0.0.1:11211'],
-                 use_memory=False, refresh_frequency=1):
-
-        """Initializes the middleware.
-
-        - app: the wsgi application the middleware wraps
-        - blacklist_ttl: defines how long in seconds an IP is blacklisted
-        - br_blacklist_ttl: defines how long in seconds an IP that did too many
-          bad requests is blacklisted
-        - queue_size: Size of the queue used to keep track of the last callers
-        - br_queue_size: Size of the queue used to keep track of the last
-          callers that provokated a bad request.
-        - treshold: ratio to mark an IP as an attacker. The ratio is the number
-          of calls the IP made
-        - br_treshold: ratio to mark an IP as an attacker. The ratio is the
-          number of bad requests calls the IP made
-        """
-        self.app = app
-        self.blacklist_ttl = blacklist_ttl
-        self.br_blacklist_ttl = br_blacklist_ttl
-        self.queue_size = queue_size
-        self.br_queue_size = br_queue_size
-        self.treshold = float(treshold)
-        self.br_treshold = float(br_treshold)
-        self._last_ips = deque(maxlen=queue_size)
-        self._last_br_ips = deque(maxlen=br_queue_size)
-        if isinstance(cache_servers, str):
-            cache_servers = [cache_servers]
-        self._cache_server = get_memcache_class(use_memory)(cache_servers)
-        self._blacklisted = Blacklist(self._cache_server, refresh_frequency)
-
-    def _check_ip(self, ip):
-        # is this IP already blacklisted ?
-        if ip in self._blacklisted:
-            # yes, it is blacklisted !
-            raise HTTPForbidden()
-
-        # insert the IP in the queue
-        # if the queue is full, the opposite-end item is discarded
-        self._last_ips.appendleft(ip)
-
-        # counts its ratio in the queue
-        count = self._last_ips.count(ip)
-        if (count > 0 and
-            float(count) / float(self.queue_size) >= self.treshold):
-            # blacklisting the IP
-            self._blacklisted.add(ip, self.blacklist_ttl)
-
-    def _inc_bad_request(self, ip):
-        # insert the IP in the br queue
-        # if the queue is full, the opposite-end item is discarded
-        self._last_br_ips.appendleft(ip)
-
-        # counts its occurences in the queue
-        count = self._last_br_ips.count(ip)
-        if count > 0 and float(count) / self.br_queue_size >= self.br_treshold:
-            # blacklisting the IP
-            self._blacklisted.add(ip, self.br_blacklist_ttl)
-
-    def __call__(self, environ, start_response):
-        start_response_status = []
-
-        def _start_response(status, headers, exc_info=None):
-            start_response_status.append(status)
-            return start_response(status, headers, exc_info)
-
-        # what's the remote ip ?
-        for header in _IP_HEADERS:
-            ip = environ.get(header)
-            if ip is not None:
-                break
-
-        if ip is None:
-            # not acceptable
-            raise HTTPForbidden()
-
-        # checking for the IP in our counter
-        self._check_ip(ip)
-
-        res = self.app(environ, _start_response)
-
-        if start_response_status[0].startswith('400'):
-            # this IP issued a 400. We want to log that
-            self._inc_bad_request(ip)
-
-        return res
+        return len(self.ips)

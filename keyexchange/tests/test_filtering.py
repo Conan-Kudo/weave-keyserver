@@ -38,7 +38,8 @@ import time
 import threading
 import random
 
-from keyexchange.filtering import IPFiltering, Blacklist
+from keyexchange.filtering.middleware import IPFiltering
+from keyexchange.filtering.blacklist import Blacklist
 from keyexchange.util import MemoryClient
 
 from webtest import TestApp, AppError
@@ -115,7 +116,6 @@ class TestIPFiltering(unittest.TestCase):
         time.sleep(1.5)
         self.app.get('/', status=200, extra_environ=env)
 
-
     def test_basics(self):
         app = self.app.app
         app.br_treshold = app.treshold = 1.1
@@ -162,7 +162,7 @@ class TestIPFiltering(unittest.TestCase):
                     self.blacklist.add(self.name + str(i))
 
                 # remove a random element
-                ips = list(self.blacklist._ips)
+                ips = list(self.blacklist.ips)
                 self.blacklist.remove(random.choice(ips))
 
                 # save the list
@@ -178,3 +178,25 @@ class TestIPFiltering(unittest.TestCase):
         # we should have 90 elements
         self.assertEqual(len(blacklist), 90)
         self.assertFalse(blacklist._dirty)
+
+    def test_admin_page(self):
+        # activate the admin page
+        self.app.app.admin_page = '/__admin__'
+        res = self.app.get('/__admin__')
+        self.assertFalse('myip' in res.body)
+
+        env = {'REMOTE_ADDR': 'myip'}
+
+        # doing 5 calls
+        for i in range(5):
+            self.app.get('/', status=200, extra_environ=env)
+
+        # the next call should be rejected
+        try:
+            self.app.get('/', status=403, extra_environ=env)
+        except HTTPForbidden:
+            pass
+
+        # and the admin page should display the IP
+        res = self.app.get('/__admin__')
+        self.assertTrue('myip' in res.body)
