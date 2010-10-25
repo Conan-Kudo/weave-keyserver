@@ -50,7 +50,6 @@ Blacklisted IPs are kept in memory with a TTL.
 import os
 from collections import deque as _deque
 
-from webob.exc import HTTPForbidden
 from mako.template import Template
 
 from keyexchange.util import get_memcache_class
@@ -117,11 +116,6 @@ class IPFiltering(object):
         self._admin_tpl = Template(filename=admin_mako)
 
     def _check_ip(self, ip):
-        # is this IP already blacklisted ?
-        if ip in self._blacklisted:
-            # yes, it is blacklisted !
-            raise HTTPForbidden()
-
         # insert the IP in the queue
         # if the queue is full, the opposite-end item is discarded
         self._last_ips.appendleft(ip)
@@ -172,9 +166,11 @@ class IPFiltering(object):
             if ip is not None:
                 break
 
-        if ip is None:
-            # not acceptable
-            raise HTTPForbidden()
+        if ip is None or ip in self._blacklisted:
+            # returning a 403
+            headers = [('Content-Type', 'text/plain')]
+            start_response('403 Forbidden', headers, sys.exc_info())
+            return ["Forbidden: You don't have permission to access"]
 
         # checking for the IP in our counter
         self._check_ip(ip)
