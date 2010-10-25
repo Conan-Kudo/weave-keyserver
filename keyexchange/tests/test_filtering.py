@@ -63,7 +63,7 @@ class TestIPFiltering(unittest.TestCase):
         # this setting will blacklist an IP that does more than 5 calls
         app = IPFiltering(FakeApp(), queue_size=10, blacklist_ttl=.5,
                           treshold=.5, br_queue_size=3,
-                          br_blacklist_ttl=.5)
+                          br_blacklist_ttl=.5, use_memory=True)
         self.app = TestApp(app)
 
     def test_reached_max(self):
@@ -162,7 +162,7 @@ class TestIPFiltering(unittest.TestCase):
                     self.blacklist.add(self.name + str(i))
 
                 # remove a random element
-                ips = list(self.blacklist._set)
+                ips = list(self.blacklist._ips)
                 self.blacklist.remove(random.choice(ips))
 
                 # save the list

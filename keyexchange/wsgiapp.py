@@ -47,13 +47,13 @@ from repoze.profile.profiler import AccumulatingProfileMiddleware as Profiler
 
 from webob.dec import wsgify
 from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
-                       HTTPBadRequest)
+                       HTTPBadRequest, HTTPMethodNotAllowed)
 
 from synccore.cef import log_failure
 from synccore.util import convert_config, filter_params
 
 from keyexchange.util import (generate_cid, json_response, CID_CHARS,
-                              PrefixedCache, Cache)
+                              PrefixedCache, get_memcache_class)
 from keyexchange.filtering import IPFiltering
 
 
@@ -69,14 +69,15 @@ class KeyExchangeApp(object):
     def __init__(self, config):
         self.config = config
         self.cid_len = config.get('keyexchange.cid_len', 4)
-        self.max_combos = len(CID_CHARS) ** self.cid_len
         self.ttl = config.get('keyexchange.ttl', 300)
-        servers = config.get('cache_servers', ['127.0.0.1:11211'])
+        servers = config.get('keyexchange.cache_servers', ['127.0.0.1:11211'])
         if isinstance(servers, str):
             self.cache_servers = [servers]
         else:
             self.cache_servers = servers
-        self.cache = PrefixedCache(Cache(self.cache_servers), _CPREFIX)
+        use_memory = config.get('keyexchange.use_memory', False)
+        cache = get_memcache_class(use_memory)(self.cache_servers)
+        self.cache = PrefixedCache(cache, _CPREFIX)
 
     def _get_new_cid(self, client_id):
         tries = 0
@@ -100,16 +101,16 @@ class KeyExchangeApp(object):
         request.config = self.config
         client_id = request.headers.get('X-KeyExchange-Id')
         method = request.method
-        url = request.environ['PATH_INFO']
+        url = request.path_info
         match = _URL.match(url)
         if match is None:
             raise HTTPNotFound()
 
-        url = match.groups()[0]
+        url = match.group(1)
         if url == 'new_channel':
             # creation of a channel
             if method != 'GET':
-                raise HTTPNotFound()
+                raise HTTPMethodNotAllowed()
             if not self._valid_client_id(client_id):
                 raise HTTPBadRequest()
 

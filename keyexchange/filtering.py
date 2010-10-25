@@ -52,7 +52,7 @@ import threading
 from collections import deque as _deque
 
 from webob.exc import HTTPForbidden
-from keyexchange.util import Cache
+from keyexchange.util import get_memcache_class
 
 # Make sure we get the IP from any proxy or loadbalancer, if any is used
 _IP_HEADERS = ('X-Forwarded-For', 'X_FORWARDED_FOR', 'REMOTE_ADDR')
@@ -82,7 +82,7 @@ class Blacklist(object):
     def __init__(self, cache_server=None):
         self._ttls = {}
         self._cache_server = cache_server
-        self._set = set()
+        self._ips = set()
         self._dirty = False
         self._lock = threading.RLock()
 
@@ -97,10 +97,10 @@ class Blacklist(object):
 
             # merging the memcached values
             if data is not None:
-                _set, ttls = data
+                ips, ttls = data
                 # get new blacklisted IP
-                if not self._set.issuperset(_set):
-                    self._set.union(_set)
+                if not self._ips.issuperset(ips):
+                    self._ips.union(ips)
                     self._ttls.update(ttls)
         finally:
             self._lock.release()
@@ -115,7 +115,7 @@ class Blacklist(object):
             # doing a CAS to avoid race conditions
             tries = 0
             while tries < 10:
-                data = self._set, self._ttls
+                data = self._ips, self._ttls
                 if self._cache_server.cas('keyexchange:blacklist', data):
                     self._dirty = False
                     break
@@ -127,7 +127,7 @@ class Blacklist(object):
     def add(self, elmt, ttl=None):
         self._lock.acquire()
         try:
-            self._set.add(elmt)
+            self._ips.add(elmt)
             if ttl is not None:
                 self._ttls[elmt] = time.time() + ttl
             else:
@@ -139,25 +139,31 @@ class Blacklist(object):
     def remove(self, elmt):
         self._lock.acquire()
         try:
-            self._set.remove(elmt)
+            self._ips.remove(elmt)
             del self._ttls[elmt]
             self._dirty = True
         finally:
             self._lock.release()
 
     def __contains__(self, elmt):
-        found = elmt in self._set
-        if found:
-            ttl = self._ttls[elmt]
-            if ttl is None:
-                return True
-            if self._ttls[elmt] - time.time() <= 0:
-                self.remove(elmt)
-                return False
-        return found
+        self._lock.acquire()
+        try:
+            found = elmt in self._ips
+            if found:
+                ttl = self._ttls[elmt]
+                if ttl is None:
+                    return True
+                if self._ttls[elmt] - time.time() <= 0:
+                    # this will not provocate a deadlock
+                    # since we use a Re-entrant lock.
+                    self.remove(elmt)
+                    return False
+            return found
+        finally:
+             self._lock.release()
 
     def __len__(self):
-        return len(self._set)
+        return len(self._ips)
 
 
 class IPFiltering(object):
@@ -165,11 +171,12 @@ class IPFiltering(object):
     """
     def __init__(self, app, blacklist_ttl=300, br_blacklist_ttl=86400,
                  queue_size=1000, br_queue_size=200, treshold=.5,
-                 br_treshold=.5, cache_servers=['127.0.0.0.1:11211']):
+                 br_treshold=.5, cache_servers=['127.0.0.0.1:11211'],
+                 use_memory=False):
 
         """Initializes the middleware.
 
-        - app: the wsgi application the middleware provides
+        - app: the wsgi application the middleware wraps
         - blacklist_ttl: defines how long in seconds an IP is blacklisted
         - br_blacklist_ttl: defines how long in seconds an IP that did too many
           bad requests is blacklisted
@@ -188,20 +195,21 @@ class IPFiltering(object):
         self.br_queue_size = br_queue_size
         self.treshold = float(treshold)
         self.br_treshold = float(br_treshold)
-        self._last_ips = deque()
-        self._last_br_ips = deque()
+        self._last_ips = deque(maxlen=queue_size)
+        self._last_br_ips = deque(maxlen=br_queue_size)
         if isinstance(cache_servers, str):
             cache_servers = [cache_servers]
-        self._cache_server = Cache(cache_servers)
+        self._cache_server = get_memcache_class(use_memory)(cache_servers)
         self._blacklisted = Blacklist(self._cache_server)
 
     def _check_ip(self, ip):
         # is this IP already blacklisted ?
         if ip in self._blacklisted:
-            # no, it is blacklisted !
+            # yes, it is blacklisted !
             raise HTTPForbidden()
 
         # insert the IP in the queue
+        # if the queue is full, the opposite-end item is discarded
         self._last_ips.appendleft(ip)
 
         # counts its ratio in the queue
@@ -211,12 +219,9 @@ class IPFiltering(object):
             # blacklisting the IP
             self._blacklisted.add(ip, self.blacklist_ttl)
 
-        # popping the oldest IP if the queue is full
-        if len(self._last_ips) > self.queue_size:
-            self._last_ips.pop()
-
     def _inc_bad_request(self, ip):
         # insert the IP in the br queue
+        # if the queue is full, the opposite-end item is discarded
         self._last_br_ips.appendleft(ip)
 
         # counts its occurences in the queue
@@ -225,18 +230,14 @@ class IPFiltering(object):
             # blacklisting the IP
             self._blacklisted.add(ip, self.br_blacklist_ttl)
 
-        # poping the oldest IP if the queue is full
-        if len(self._last_br_ips) > self.br_queue_size:
-            self._last_br_ips.pop()
-
     def __call__(self, environ, start_response):
         # getting the blacklisted IPs
         self._blacklisted.update()
         start_response_status = []
 
-        def _start_response(status, headers):
+        def _start_response(status, headers, exc_info=None):
             start_response_status.append(status)
-            return start_response(status, headers)
+            return start_response(status, headers, exc_info)
 
         try:
             # what's the remote ip ?

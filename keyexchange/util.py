@@ -50,10 +50,7 @@ def json_response(data, dump=True, **kw):
     """Returns Response containing a json string"""
     if dump:
         data = json.dumps(data)
-    resp = Response(data, content_type='application/json')
-    for key, value in kw.items():
-        setattr(resp, key, value)
-    return resp
+    return Response(data, content_type='application/json', **kw)
 
 
 def generate_cid(size=4):
@@ -110,11 +107,13 @@ class PrefixedCache(object):
         return self.cache.add(self.prefix + key, value, **kw)
 
 
-try:
-    from pylibmc import Client as Cache
-except (ImportError, RuntimeError):
+def get_memcache_class(memory=False):
+    """Returns the memcache class."""
+    if memory:
+        return MemoryClient
     try:
-        from memcache import Client as Cache # NOQA
-    except ImportError:
-        # using memory
-        Cache = MemoryClient    # NOQA
+        import pylibmc
+        return pylibmc.Client
+    except (ImportError, RuntimeError):
+        import memcache
+        return memcache.Client
