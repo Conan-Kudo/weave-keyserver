@@ -347,6 +347,8 @@ class TestWsgiApp(unittest.TestCase):
                 getattr(self.app, method)(url, status=404,
                                           extra_environ=self.env)
 
+        self.app.delete('/new_channel', status=405, extra_environ=self.env)
+
     def test_cef_logger(self):
         # creating a channel
         headers = {'X-KeyExchange-Id': 'b' * 256}
