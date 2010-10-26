@@ -63,7 +63,10 @@ class _Syncer(threading.Thread):
         self.running = True
         while self.running:
             # this syncs the blacklist
-            self.blacklist.save()
+            if self.blacklist.outsynced:
+                self.blacklist.save()
+            else:
+                self.blacklist.update()
             time.sleep(self.frequency)
 
     def join(self):
@@ -88,6 +91,13 @@ class Blacklist(object):
         self._syncer = _Syncer(self, frequency=frequency)
         # sys.exit() call all threads join() in >= 2.6.5
         self._syncer.start()
+
+    def _get_dirty(self):
+        # hiding it behind a property since
+        # this design could change internally
+        return self._dirty
+
+    outsynced = property(_get_dirty)
 
     def update(self):
         """Loads the IP list from memcached."""
