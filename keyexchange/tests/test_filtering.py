@@ -67,6 +67,23 @@ class TestIPFiltering(unittest.TestCase):
                           br_blacklist_ttl=.5, use_memory=True)
         self.app = TestApp(app)
 
+    def test_reached_max_observe(self):
+        self.app.app.observe = True
+        env = {'REMOTE_ADDR': 'bad_guy'}
+
+        # no ip, no chocolate
+        try:
+            self.app.get('/', status=403)
+        except HTTPForbidden:
+            pass
+
+        # doing 5 calls
+        for i in range(5):
+            self.app.get('/', status=200, extra_environ=env)
+
+        # the next call should *NOT* be rejected
+        self.app.get('/', status=200, extra_environ=env)
+
     def test_reached_max(self):
         env = {'REMOTE_ADDR': '127.0.0.1'}
 

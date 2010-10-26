@@ -104,7 +104,8 @@ class IPFiltering(object):
     def __init__(self, app, blacklist_ttl=300, br_blacklist_ttl=86400,
                  queue_size=200, br_queue_size=20, treshold=20,
                  br_treshold=5, cache_servers=['127.0.0.0.1:11211'],
-                 admin_page=None, use_memory=False, refresh_frequency=1):
+                 admin_page=None, use_memory=False, refresh_frequency=1,
+                 observe=False):
 
         """Initializes the middleware.
 
@@ -117,6 +118,11 @@ class IPFiltering(object):
           callers that provokated a bad request.
         - treshold: max number of calls per IP before we blacklist it.
         - br_treshold: max number of bad request per IP before we blacklist it.
+        - observe: if set to True, IPs are still blacklisted but not rejected.
+          This mode is useful to observe the behavior of an application without
+          rejecting any call, to make sure a configuration works fine. Notice
+          that a blacklisted IP will continue to raise its counter in the
+          queue.
         """
         self.app = app
         self.blacklist_ttl = blacklist_ttl
@@ -125,6 +131,7 @@ class IPFiltering(object):
         self.br_queue_size = br_queue_size
         self.treshold = treshold
         self.br_treshold = br_treshold
+        self.observe = observe
         self._last_ips = IPQueue(queue_size)
         self._last_br_ips = IPQueue(br_queue_size)
         if isinstance(cache_servers, str):
@@ -197,7 +204,7 @@ class IPFiltering(object):
             if ip is not None:
                 break
 
-        if ip is None or ip in self._blacklisted:
+        if ip is None or (ip in self._blacklisted and not self.observe):
             # returning a 403
             headers = [('Content-Type', 'text/plain')]
             start_response('403 Forbidden', headers)
