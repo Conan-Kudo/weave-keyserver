@@ -62,6 +62,15 @@ _CPREFIX = 'keyexchange:'
 _INC_KEY = '%schannel_id' % _CPREFIX
 _NOT_FOUND, _FAILED, _SUCCESS = range(3)
 _DELETE_LOG = 'DeleteLog'
+_INVALID_CID = 'InvalidChannelId'
+_INVALID_UID = 'InvalidClientId'
+_UNKNOWN_UID = 'UnknownClientId'
+
+
+def _cid2str(cid):
+    if cid is None:
+        return 'EMPTY'
+    return cid
 
 
 class KeyExchangeApp(object):
@@ -112,12 +121,18 @@ class KeyExchangeApp(object):
             if method != 'GET':
                 raise HTTPMethodNotAllowed()
             if not self._valid_client_id(client_id):
-                raise HTTPBadRequest()
+                # The X-KeyExchange-Id is valid
+                try:
+                    log = 'Invalid X-KeyExchange-Id value: "%s"' % \
+                            _cid2str(client_id)
+                    log_failure(log, 5, request, signature=_INVALID_UID)
+                finally:
+                    raise HTTPBadRequest()
 
             return json_response(self._get_new_cid(client_id))
 
         # validating the client id - or registering id #2
-        channel_content = self._check_client_id(url, client_id)
+        channel_content = self._check_client_id(url, client_id, request)
 
         # actions are dispatched in this class
         method = getattr(self, '%s_channel' % method.lower(), None)
@@ -129,19 +144,29 @@ class KeyExchangeApp(object):
     def _valid_client_id(self, client_id):
         return client_id is not None and len(client_id) == 256
 
-    def _check_client_id(self, channel_id, client_id):
+    def _check_client_id(self, channel_id, client_id, request):
         """Registers the client id into the channel.
 
         If there are already two registered ids, the channel is closed
         and we send back a 400. Also returns the new channel content.
         """
         if not self._valid_client_id(client_id):
-            # we need to kill the channel
-            self._delete_channel(channel_id)
-            raise HTTPBadRequest()
+            # the key is invalid
+            try:
+                log = 'Invalid X-KeyExchange-Id value: "%s"' % \
+                        _cid2str(client_id)
+                log_failure(log, 5, request, signature=_INVALID_UID)
+
+                # we need to kill the channel
+                self._delete_channel(channel_id)
+            finally:
+                raise HTTPBadRequest()
 
         content = self.cache.get(channel_id)
         if content is None:
+            # we have a valid channel id but it does not exists.
+            log = 'Requested an invalid channel id'
+            log_failure(log, 5, request, signature=_INVALID_CID)
             raise HTTPNotFound()
 
         ttl, ids, data, etag = content
@@ -155,9 +180,13 @@ class KeyExchangeApp(object):
             if client_id in ids:
                 return  content  # already registered
 
-            # that's an unknown id
-            self._delete_channel(channel_id)
-            raise HTTPBadRequest()
+            # that's an unknown id, hu-ho
+            try:
+                log = 'Unknown X-KeyExchange-Id value: "%s"' % client_id
+                log_failure(log, 5, request, signature=_UNKNOWN_UID)
+                self._delete_channel(channel_id)
+            finally:
+                raise HTTPBadRequest()
 
         content = ttl, ids, data, etag
 
