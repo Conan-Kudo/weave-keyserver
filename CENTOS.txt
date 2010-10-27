@@ -1,0 +1,42 @@
+================
+CentOS packaging
+================
+
+This is the process to release KeyExchange as a RPM collection.
+
+
+It requires a few tools::
+
+    $ yum install rpm-build python26 python26-setuptools
+    $ easy_install-2.6 pypi2rpm
+    $ easy_install-2.6 Distutils2
+
+
+Next, create an RPM for every dependency, using pypi2rpm::
+
+    $ pypi2rpm.py WebOb
+    $ pypi2rpm.py Paste
+    $ pypi2rpm.py PasteDeploy
+
+
+For sync-core, since there's no release yet::
+
+    $ hg clone https://hg.mozilla.org/services/server-core
+    $ pypi2rpm.py server-core
+
+
+Last, for KeyExchange itself::
+
+    $ python2.6 setup.py bdist_rpm
+
+
+Once this is over, you should have these rpm:
+
+- python-webob
+- python-paste
+- python-pastedeploy
+- python-synccore
+- python-keyexchange
+
+Installing python-keyexchange with Yum will install all dependencies,
+including those we created.
