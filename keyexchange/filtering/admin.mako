@@ -1,6 +1,14 @@
 <html>
  <body>
-   <h1>Blacklisted IPs</h1>
+   <h1>
+   %if not observe:
+    Status: Active
+   %endif
+   %if observe:
+    Status: Observing
+   %endif
+   </h1>
+   <h2>Blacklisted IPs</h2>
    %if not ips:
    None
    %endif

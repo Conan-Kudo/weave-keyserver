@@ -184,7 +184,8 @@ class IPFiltering(object):
         start_response('200 OK', headers)
         # we want to display the list of blacklisted IPs
         return [self._admin_tpl.render(ips=self._blacklisted.ips,
-                                       admin_page=self.admin_page)]
+                                       admin_page=self.admin_page,
+                                       observe=self.observe)]
 
     def __call__(self, environ, start_response):
         # is it an admin call ?
