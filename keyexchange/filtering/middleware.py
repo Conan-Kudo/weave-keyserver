@@ -105,7 +105,7 @@ class IPFiltering(object):
                  queue_size=200, br_queue_size=20, treshold=20,
                  br_treshold=5, cache_servers=['127.0.0.0.1:11211'],
                  admin_page=None, use_memory=False, refresh_frequency=1,
-                 observe=False):
+                 observe=False, callback=None):
 
         """Initializes the middleware.
 
@@ -123,6 +123,8 @@ class IPFiltering(object):
           rejecting any call, to make sure a configuration works fine. Notice
           that a blacklisted IP will continue to raise its counter in the
           queue.
+        - callback: callable that will be called with an IP that is added
+          in the blacklist.
         """
         self.app = app
         self.blacklist_ttl = blacklist_ttl
@@ -143,6 +145,7 @@ class IPFiltering(object):
         self.admin_page = admin_page
         admin_mako = os.path.join(os.path.dirname(__file__), 'admin.mako')
         self._admin_tpl = Template(filename=admin_mako)
+        self.callback = callback
 
     def _check_ip(self, ip):
         # insert the IP in the queue
@@ -153,6 +156,8 @@ class IPFiltering(object):
         if self._last_ips.count(ip) >= self.treshold:
             # blacklisting the IP
             self._blacklisted.add(ip, self.blacklist_ttl)
+            if self.callback is not None:
+                self.callback(ip)
 
     def _inc_bad_request(self, ip):
         # insert the IP in the br queue
@@ -163,6 +168,8 @@ class IPFiltering(object):
         if self._last_br_ips.count(ip) >= self.br_treshold:
             # blacklisting the IP
             self._blacklisted.add(ip, self.br_blacklist_ttl)
+            if self.callback is not None:
+                self.callback(ip)
 
     def admin(self, environ, start_response):
         """Displays an admin page containing the blacklisted IPs

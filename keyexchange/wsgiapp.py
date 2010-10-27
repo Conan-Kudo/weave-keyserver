@@ -62,6 +62,7 @@ _DELETE_LOG = 'DeleteLog'
 _INVALID_CID = 'InvalidChannelId'
 _INVALID_UID = 'InvalidClientId'
 _UNKNOWN_UID = 'UnknownClientId'
+_BLACKLISTED = 'BlacklistedIP'
 
 
 def _cid2str(cid):
@@ -246,12 +247,16 @@ class KeyExchangeApp(object):
 
         return json_response('')
 
+    def blacklisted(self, ip):
+        log_failure('blacklisted', 5, ip, signature=_BLACKLISTED)
+
 
 def make_app(global_conf, **app_conf):
     """Returns a Key Exchange Application."""
     global_conf.update(app_conf)
     config = convert_config(global_conf)
     app = KeyExchangeApp(config)
+    blacklisted = app.blacklisted
 
     # hooking a profiler
     if global_conf.get('profile', 'false').lower() == 'true':
@@ -271,6 +276,7 @@ def make_app(global_conf, **app_conf):
     # IP Filtering middleware
     if config.get('filtering.use', False):
         del config['filtering.use']
+        config['filtering.callback'] = blacklisted
         app = IPFiltering(app, **filter_params('filtering', config))
 
     return app
