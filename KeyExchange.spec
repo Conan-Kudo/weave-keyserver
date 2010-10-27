@@ -38,14 +38,22 @@ See: https://wiki.mozilla.org/Services/Sync/SyncKey/J-PAKE
 python2.6 setup.py build
 
 %install
+
+# the config files for the app
 mkdir -p %{buildroot}%{_sysconfdir}/keyexchange
-install -m 0644 etc/keyexchange.wsgi %{buildroot}%{_sysconfdir}/keyexchange/keyexchange.wsgi
+install -m 0644 etc/keyexchange.conf %{buildroot}%{_sysconfdir}/keyexchange/keyexchange.conf
 install -m 0644 etc/production.ini %{buildroot}%{_sysconfdir}/keyexchange/production.ini
+
+# nginx config
 mkdir -p %{buildroot}%{_sysconfdir}/nginx
 mkdir -p %{buildroot}%{_sysconfdir}/nginx/conf.d
 install -m 0644 etc/keyexchange.nginx.conf %{buildroot}%{_sysconfdir}/nginx/conf.d/keyexchange.conf
+
+# logging
 mkdir -p %{buildroot}%{_localstatedir}/log
 touch %{buildroot}%{_localstatedir}/log/keyexchange.log
+
+# the app
 python2.6 setup.py install --single-version-externally-managed --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
 
 %clean
@@ -63,7 +71,6 @@ chmod 750 %{_localstatedir}/log/keyexchange.log
 %dir %{_sysconfdir}/keyexchange/
 
 %config(noreplace) %{_sysconfdir}/keyexchange/*
-
 %config(noreplace) %{_sysconfdir}/nginx/conf.d/keyexchange.conf
 
 %defattr(-,root,root)
