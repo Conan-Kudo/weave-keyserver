@@ -42,9 +42,6 @@ from hashlib import md5
 import json
 import time
 
-from paste.translogger import TransLogger
-from repoze.profile.profiler import AccumulatingProfileMiddleware as Profiler
-
 from webob.dec import wsgify
 from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
                        HTTPBadRequest, HTTPMethodNotAllowed)
@@ -258,14 +255,16 @@ def make_app(global_conf, **app_conf):
 
     # hooking a profiler
     if global_conf.get('profile', 'false').lower() == 'true':
-        app = Profiler(app, log_filename='profile.log',
-                       cachegrind_filename='cachegrind.out',
-                       discard_first_request=True,
-                       flush_at_shutdown=True,
-                       path='/__profile__')
+        from repoze.profile.profiler import AccumulatingProfileMiddleware
+        app = AccumulatingProfileMiddleware(app, log_filename='profile.log',
+                                            cachegrind_filename='cachegrind.out',
+                                            discard_first_request=True,
+                                            flush_at_shutdown=True,
+                                            path='/__profile__')
 
     # hooking a logger
     if global_conf.get('translogger', 'false').lower() == 'true':
+        from paste.translogger import TransLogger
         app = TransLogger(app, logger_name='jpakeapp',
                           setup_console_handler=True)
 
