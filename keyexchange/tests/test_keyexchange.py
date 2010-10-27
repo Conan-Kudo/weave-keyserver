@@ -43,7 +43,7 @@ import random
 import hashlib
 import os
 
-from webtest import TestApp
+from webtest import TestApp, AppError
 from paste.deploy import loadapp
 
 from keyexchange.tests.client import JPAKE
@@ -373,3 +373,12 @@ class TestWsgiApp(unittest.TestCase):
             wsgiapp.log_failure = old
 
         self.assertEqual(logs[0], 'my log')
+
+        # let's see if the real callback is correctly called
+        self.app.app.br_treshold = 2
+        for i in range(2):
+            try:
+                self.app.get('/new_channel', extra_environ=self.env)
+            except AppError:
+                pass
+

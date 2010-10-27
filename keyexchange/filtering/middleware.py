@@ -52,6 +52,7 @@ import cgi
 from collections import deque
 
 from mako.template import Template
+from webob.dec import wsgify
 
 from keyexchange.util import get_memcache_class
 from keyexchange.filtering.blacklist import Blacklist
@@ -147,7 +148,7 @@ class IPFiltering(object):
         self._admin_tpl = Template(filename=admin_mako)
         self.callback = callback
 
-    def _check_ip(self, ip):
+    def _check_ip(self, ip, environ):
         # insert the IP in the queue
         # if the queue is full, the opposite-end item is discarded
         self._last_ips.append(ip)
@@ -157,9 +158,9 @@ class IPFiltering(object):
             # blacklisting the IP
             self._blacklisted.add(ip, self.blacklist_ttl)
             if self.callback is not None:
-                self.callback(ip)
+                self.callback(ip, environ)
 
-    def _inc_bad_request(self, ip):
+    def _inc_bad_request(self, ip, environ):
         # insert the IP in the br queue
         # if the queue is full, the opposite-end item is discarded
         self._last_br_ips.append(ip)
@@ -169,7 +170,7 @@ class IPFiltering(object):
             # blacklisting the IP
             self._blacklisted.add(ip, self.br_blacklist_ttl)
             if self.callback is not None:
-                self.callback(ip)
+                self.callback(ip, environ)
 
     def admin(self, environ, start_response):
         """Displays an admin page containing the blacklisted IPs
@@ -219,12 +220,12 @@ class IPFiltering(object):
             return ["Forbidden: You don't have permission to access"]
 
         # checking for the IP in our counter
-        self._check_ip(ip)
+        self._check_ip(ip, environ)
 
         res = self.app(environ, _start_response)
 
         if start_response_status[0].startswith('400'):
             # this IP issued a 400. We want to log that
-            self._inc_bad_request(ip)
+            self._inc_bad_request(ip, environ)
 
         return res

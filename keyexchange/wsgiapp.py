@@ -123,7 +123,8 @@ class KeyExchangeApp(object):
                 try:
                     log = 'Invalid X-KeyExchange-Id value: "%s"' % \
                             _cid2str(client_id)
-                    log_failure(log, 5, request, signature=_INVALID_UID)
+                    log_failure(log, 5, request.environ, self.config,
+                                signature=_INVALID_UID)
                 finally:
                     raise HTTPBadRequest()
 
@@ -153,7 +154,8 @@ class KeyExchangeApp(object):
             try:
                 log = 'Invalid X-KeyExchange-Id value: "%s"' % \
                         _cid2str(client_id)
-                log_failure(log, 5, request, signature=_INVALID_UID)
+                log_failure(log, 5, request.environ, self.config,
+                            signature=_INVALID_UID)
 
                 # we need to kill the channel
                 self._delete_channel(channel_id)
@@ -164,7 +166,8 @@ class KeyExchangeApp(object):
         if content is None:
             # we have a valid channel id but it does not exists.
             log = 'Requested an invalid channel id'
-            log_failure(log, 5, request, signature=_INVALID_CID)
+            log_failure(log, 5, request.environ, self.config,
+                        signature=_INVALID_CID)
             raise HTTPNotFound()
 
         ttl, ids, data, etag = content
@@ -181,7 +184,8 @@ class KeyExchangeApp(object):
             # that's an unknown id, hu-ho
             try:
                 log = 'Unknown X-KeyExchange-Id value: "%s"' % client_id
-                log_failure(log, 5, request, signature=_UNKNOWN_UID)
+                log_failure(log, 5, request.environ, self.config,
+                            signature=_UNKNOWN_UID)
                 self._delete_channel(channel_id)
             finally:
                 raise HTTPBadRequest()
@@ -243,12 +247,14 @@ class KeyExchangeApp(object):
         # log a message, if any is provided in the X-KeyExchange-Log header
         log = request.headers.get('X-KeyExchange-Log')
         if log is not None:
-            log_failure(log, 5, request, signature=_DELETE_LOG)
+            log_failure(log, 5, request.environ, self.config,
+                        signature=_DELETE_LOG)
 
         return json_response('')
 
-    def blacklisted(self, ip):
-        log_failure('blacklisted', 5, ip, signature=_BLACKLISTED)
+    def blacklisted(self, ip, environ):
+        log_failure('%s blacklisted' % ip, 5, environ, self.config,
+                    signature=_BLACKLISTED)
 
 
 def make_app(global_conf, **app_conf):
@@ -276,7 +282,7 @@ def make_app(global_conf, **app_conf):
     # IP Filtering middleware
     if config.get('filtering.use', False):
         del config['filtering.use']
-        config['filtering.callback'] = blacklisted
-        app = IPFiltering(app, **filter_params('filtering', config))
+        app = IPFiltering(app, callback=blacklisted,
+                          **filter_params('filtering', config))
 
     return app
