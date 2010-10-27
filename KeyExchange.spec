@@ -16,7 +16,7 @@ BuildRoot: %{_tmppath}/%{pythonname}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
 Vendor: Tarek Ziade <tarek@mozilla.com>
-Requires: nginx memcached uwsgi python26 pylibmc python26-setuptools python-webob python-paste python-pastedeploy python-pastescript python-sync-core
+Requires: nginx memcached uwsgi python26 pylibmc python26-setuptools python-webob python-paste python-pastedeploy python-synccore
 
 Url: https://hg.mozilla.org/services/server-key-exchange
 
