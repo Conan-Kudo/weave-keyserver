@@ -54,7 +54,7 @@ from keyexchange.util import (generate_cid, json_response, CID_CHARS,
 from keyexchange.filtering import IPFiltering
 
 
-_URL = re.compile('^/(new_channel|[%s]+)/?$' % CID_CHARS)
+_URL = re.compile('^/(new_channel|report|[%s]+)/?$' % CID_CHARS)
 _CPREFIX = 'keyexchange:'
 _INC_KEY = '%schannel_id' % _CPREFIX
 _NOT_FOUND, _FAILED, _SUCCESS = range(3)
@@ -63,6 +63,7 @@ _INVALID_CID = 'InvalidChannelId'
 _INVALID_UID = 'InvalidClientId'
 _UNKNOWN_UID = 'UnknownClientId'
 _BLACKLISTED = 'BlacklistedIP'
+_REPORT = 'Report'
 
 
 def _cid2str(cid):
@@ -129,6 +130,10 @@ class KeyExchangeApp(object):
                     raise HTTPBadRequest()
 
             return json_response(self._get_new_cid(client_id))
+        elif url == 'report':
+            if method != 'POST':
+                raise HTTPMethodNotAllowed()
+            return self.report(request)
 
         # validating the client id - or registering id #2
         channel_content = self._check_client_id(url, client_id, request)
@@ -255,6 +260,13 @@ class KeyExchangeApp(object):
     def blacklisted(self, ip, environ):
         log_failure('%s blacklisted' % ip, 5, environ, self.config,
                     signature=_BLACKLISTED)
+
+    def report(self, request):
+        """Reports a log."""
+        log = request.headers.get('X-KeyExchange-Log', '')
+        log += '\n%s' % request.body
+        log_failure(log, 5, request.environ, self.config, signature=_REPORT)
+        return json_response('')
 
 
 def make_app(global_conf, **app_conf):

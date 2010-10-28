@@ -46,6 +46,7 @@ import os
 from webtest import TestApp, AppError
 from paste.deploy import loadapp
 
+from keyexchange import wsgiapp
 from keyexchange.tests.client import JPAKE
 from keyexchange.util import MemoryClient
 
@@ -362,7 +363,6 @@ class TestWsgiApp(unittest.TestCase):
             logs.append(log)
 
         # let's delete it with a log message
-        from keyexchange import wsgiapp
         old = wsgiapp.log_failure
         wsgiapp.log_failure = _counter
         try:
@@ -382,3 +382,21 @@ class TestWsgiApp(unittest.TestCase):
             except AppError:
                 pass
 
+    def test_report(self):
+        logs = []
+
+        def _counter(log, *args, **kw):
+            logs.append(log)
+
+        headers = {'X-KeyExchange-Log': 'some'}
+        old = wsgiapp.log_failure
+        wsgiapp.log_failure = _counter
+        try:
+            self.app.post('/report', params='somelog', extra_environ=self.env)
+            self.app.post('/report', params='more', extra_environ=self.env,
+                          headers=headers)
+        finally:
+            wsgiapp.log_failure = old
+
+        self.assertEqual(logs[0].strip(), 'somelog')
+        self.assertEqual(logs[1], 'some\nmore')
