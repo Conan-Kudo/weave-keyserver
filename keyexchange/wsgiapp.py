@@ -264,7 +264,7 @@ class KeyExchangeApp(object):
     def report(self, request):
         """Reports a log."""
         log = request.headers.get('X-KeyExchange-Log', '')
-        log += '\n%s' % request.body
+        log += '\n%s' % request.body[:2000]
         log_failure(log, 5, request.environ, self.config, signature=_REPORT)
         return json_response('')
 
