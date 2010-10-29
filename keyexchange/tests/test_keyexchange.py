@@ -382,6 +382,30 @@ class TestWsgiApp(unittest.TestCase):
             except AppError:
                 pass
 
+    def test_cef_error(self):
+        # creating a channel
+        headers = {'X-KeyExchange-Id': 'b' * 256, 'User-Agent': '|'}
+        res = self.app.get('/new_channel', status=200,
+                           headers=headers, extra_environ=self.env)
+        cid = str(json.loads(res.body))
+        curl = '/%s' % cid
+
+        headers['X-KeyExchange-Id'] = 'a' * 256
+        self.app.get(curl, status=200, headers=headers,
+                     extra_environ=self.env)
+
+        # third actor should force channel delete
+        headers['X-KeyExchange-Id'] = 'c' * 256
+        try:
+            self.app.get(curl, status=400, headers=headers,
+                     extra_environ=self.env)
+        except AppError:
+            pass
+
+        # channel should not exist anymore
+        self.app.get(curl, status=404, headers=headers,
+                     extra_environ=self.env)
+
     def test_report(self):
         logs = []
 

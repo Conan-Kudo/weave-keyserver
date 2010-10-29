@@ -58,7 +58,7 @@ from keyexchange.util import get_memcache_class
 from keyexchange.filtering.blacklist import Blacklist
 
 # Make sure we get the IP from any proxy or loadbalancer, if any is used
-_IP_HEADERS = ('X-Forwarded-For', 'X_FORWARDED_FOR', 'REMOTE_ADDR')
+_IP_HEADERS = ('X_FORWARDED_FOR', 'REMOTE_ADDR')
 
 
 class IPQueue(deque):
