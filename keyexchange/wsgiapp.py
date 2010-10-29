@@ -161,10 +161,9 @@ class KeyExchangeApp(object):
                         _cid2str(client_id)
                 log_failure(log, 5, request.environ, self.config,
                             signature=_INVALID_UID)
-
+            finally:
                 # we need to kill the channel
                 self._delete_channel(channel_id)
-            finally:
                 raise HTTPBadRequest()
 
         content = self.cache.get(channel_id)
@@ -191,8 +190,8 @@ class KeyExchangeApp(object):
                 log = 'Unknown X-KeyExchange-Id value: "%s"' % client_id
                 log_failure(log, 5, request.environ, self.config,
                             signature=_UNKNOWN_UID)
-                self._delete_channel(channel_id)
             finally:
+                self._delete_channel(channel_id)
                 raise HTTPBadRequest()
 
         content = ttl, ids, data, etag
