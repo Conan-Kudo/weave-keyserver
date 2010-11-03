@@ -46,7 +46,7 @@ from webob.dec import wsgify
 from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
                        HTTPBadRequest, HTTPMethodNotAllowed)
 
-from synccore.cef import log_failure
+from services.cef import log_failure
 from synccore.util import convert_config, filter_params
 
 from keyexchange.util import (generate_cid, json_response, CID_CHARS,
