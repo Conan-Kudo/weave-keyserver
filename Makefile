@@ -7,6 +7,7 @@ COVEROPTS = --cover-html --cover-html-dir=html --with-coverage --cover-package=k
 COVERAGE = bin/coverage
 PYLINT = bin/pylint
 PKGS = keyexchange
+PYPI2RPM = bin/pypi2rpm.py
 
 .PHONY: all build test bench_one bench bend_report build_rpm hudson lint
 
@@ -21,6 +22,7 @@ build:
 	$(EZ) Funkload
 	$(EZ) pylint
 	$(EZ) coverage
+	$(EZ) pypi2rpm
 
 test:
 	$(NOSE) $(TESTS)
@@ -51,3 +53,10 @@ lint:
 	rm -f pylint.txt
 	- $(PYLINT) -f parseable --rcfile=pylintrc $(PKGS) > pylint.txt
 
+build_rpms:
+	rm -rf $(CURDIR)/rpms
+	mkdir $(CURDIR)/rpms
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms webob
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms paste
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastedeploy
+	rm -rf build; $(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=KeyExchange.spec --dist-dir=$(CURDIR)/rpms --binary-only
