@@ -98,6 +98,13 @@ class IPQueue(deque):
     def __len__(self):
         return len(self._ips)
 
+    def __contains__(self, ip):
+        return ip in self._ips
+
+    def remove(self, ip):
+        self._ips.remove(ip)
+        del self._counter[ip]
+
 
 class IPFiltering(object):
     """Filtering IPs
@@ -185,6 +192,11 @@ class IPFiltering(object):
         for ip in ips:
             try:
                 self._blacklisted.remove(ip)
+                self._blacklisted.save()  # force immediate save
+                if ip in self._last_ips:
+                    self._last_ips.remove(ip)
+                if ip in self._last_br_ips:
+                    self._last_br_ips.remove(ip)
             except KeyError:
                 pass
 

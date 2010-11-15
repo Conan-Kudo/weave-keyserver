@@ -219,6 +219,9 @@ class TestIPFiltering(unittest.TestCase):
         res = self.app.get('/__admin__')
         self.assertTrue('myip' in res.body)
 
+        # and the IP should be in the queue
+        self.assertTrue('myip' in self.app.app._last_ips)
+
         # let's remove the IP from the blacklist
         res.form['myip'].checked = True
         res.form.submit()
@@ -226,3 +229,7 @@ class TestIPFiltering(unittest.TestCase):
         # and the IP should be gone
         res = self.app.get('/__admin__')
         self.assertTrue('myip' not in res.body)
+
+        # and the IP should also be removed from the IP queues
+        self.assertTrue('myip' not in self.app.app._last_ips)
+        self.assertTrue('myip' not in self.app.app._last_br_ips)
