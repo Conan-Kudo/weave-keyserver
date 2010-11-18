@@ -9,7 +9,7 @@ PYLINT = bin/pylint
 PKGS = keyexchange
 PYPI2RPM = bin/pypi2rpm.py
 
-.PHONY: all build test bench_one bench bend_report build_rpm hudson lint
+.PHONY: all build test bench_one bench bend_report build_rpms hudson lint build_core
 
 all:	build
 
@@ -42,9 +42,6 @@ bench2:
 bench_report:
 	bin/fl-build-report --html -o html keyexchange/tests/stress-bench.xml
 
-build_rpm:
-	$(PYTHON) setup.py bdist_rpm
-
 hudson:
 	rm -f coverage.xml
 	- $(COVERAGE) run --source=keyexchange $(NOSE) $(TESTS); $(COVERAGE) xml
@@ -61,3 +58,8 @@ build_rpms:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastedeploy
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastescript
 	rm -rf build; $(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=KeyExchange.spec --dist-dir=$(CURDIR)/rpms --binary-only
+
+build_core:
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms deps/server-core
+
+
