@@ -35,13 +35,12 @@
 # ***** END LICENSE BLOCK *****
 """ Various helpers.
 """
-import string
 import json
 import random
 
 from webob import Response
 
-CID_CHARS = string.digits + string.lowercase
+CID_CHARS = '23456789abcdefghijkmnpqrstuvwxyz'
 
 # initialize the random seed. This will use os.urandom()
 random.seed()
