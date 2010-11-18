@@ -1,4 +1,4 @@
-%define name python-keyexchange
+%define name python26-keyexchange
 %define pythonname KeyExchange
 %define version 0.1
 %define unmangled_version 0.1
