@@ -59,4 +59,5 @@ build_rpms:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms webob
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms paste
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastedeploy
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastescript
 	rm -rf build; $(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=KeyExchange.spec --dist-dir=$(CURDIR)/rpms --binary-only

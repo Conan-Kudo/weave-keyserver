@@ -3,7 +3,7 @@
 %define version 0.1
 %define unmangled_version 0.1
 %define unmangled_version 0.1
-%define release 1
+%define release 2
 
 Summary: Key Exchange server
 Name: %{name}
@@ -16,7 +16,7 @@ BuildRoot: %{_tmppath}/%{pythonname}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
 Vendor: Tarek Ziade <tarek@mozilla.com>
-Requires: nginx memcached gunicorn python26 pylibmc python26-setuptools python26-webob python26-paste python26-pastedeploy python26-synccore
+Requires: nginx memcached gunicorn python26 pylibmc python26-setuptools python26-webob python26-paste python26-pastedeploy python26-pastescript python26-synccore
 
 Url: https://hg.mozilla.org/services/server-key-exchange
 
@@ -61,12 +61,12 @@ rm -rf $RPM_BUILD_ROOT
 
 %post
 touch %{_localstatedir}/log/keyexchange.log
-chown apache:apache %{_localstatedir}/log/keyexchange.log
-chmod 750 %{_localstatedir}/log/keyexchange.log
+chown nginx:nginx %{_localstatedir}/log/keyexchange.log
+chmod 640 %{_localstatedir}/log/keyexchange.log
 
 %files -f INSTALLED_FILES
 
-%attr(750, apache, apache) %ghost %{_localstatedir}/log/keyexchange.log
+%attr(640, nginx, nginx) %ghost %{_localstatedir}/log/keyexchange.log
 
 %dir %{_sysconfdir}/keyexchange/
 
