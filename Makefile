@@ -60,6 +60,6 @@ build_rpms:
 	rm -rf build; $(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=KeyExchange.spec --dist-dir=$(CURDIR)/rpms --binary-only
 
 build_core:
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms deps/server-core
+	cd deps/server-core; rm -rf build; ../../$(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=SyncCore.spec --dist-dir=$(CURDIR)/rpms --binary-only
 
 
