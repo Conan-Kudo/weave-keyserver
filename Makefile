@@ -58,9 +58,11 @@ build_rpms:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastedeploy
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastescript
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms mako
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms markupsafe
 	rm -rf build; $(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=KeyExchange.spec --dist-dir=$(CURDIR)/rpms --binary-only
 
 build_core:
 	cd deps/server-core; rm -rf build; ../../$(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=SyncCore.spec --dist-dir=$(CURDIR)/rpms --binary-only
-
-
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms simplejson
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms routes
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms sqlalchemy
