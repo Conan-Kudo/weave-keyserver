@@ -63,10 +63,16 @@ class _Syncer(threading.Thread):
         self.running = True
         while self.running:
             # this syncs the blacklist
-            if self.blacklist.outsynced:
-                self.blacklist.save()
-            else:
-                self.blacklist.update()
+            try:
+                if self.blacklist.outsynced:
+                    self.blacklist.save()
+                else:
+                    self.blacklist.update()
+            except Exception, e:
+                # in case something goes wrong
+                # we log it but don't want our thread to die.
+                logger.error(str(e))
+
             time.sleep(self.frequency)
 
     def join(self):

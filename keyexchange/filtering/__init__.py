@@ -33,5 +33,7 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-
+import logging
 from keyexchange.filtering.middleware import IPFiltering
+
+logger = logging.getLogger('ipfiltering')
