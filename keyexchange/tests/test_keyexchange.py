@@ -343,7 +343,7 @@ class TestWsgiApp(unittest.TestCase):
 
     def test_404s(self):
         # make sure other requests are issuing 404s
-        for url in ('/', '/some/url', '/UPER'):
+        for url in ('/some/url', '/UPER', '/o'):
             for method in ('get', 'put', 'post', 'delete'):
                 getattr(self.app, method)(url, status=404,
                                           extra_environ=self.env)
@@ -424,3 +424,9 @@ class TestWsgiApp(unittest.TestCase):
 
         self.assertEqual(logs[0].strip(), 'somelog')
         self.assertEqual(logs[1], 'some\nmore')
+
+    def test_root(self):
+        # the root must redirect to https://services.mozilla.com/
+
+        res = self.app.get('/', status=301, extra_environ=self.env)
+        self.assertEqual(res.location, 'https://services.mozilla.com')

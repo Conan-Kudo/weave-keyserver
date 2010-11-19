@@ -44,7 +44,8 @@ import time
 
 from webob.dec import wsgify
 from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
-                       HTTPBadRequest, HTTPMethodNotAllowed)
+                       HTTPBadRequest, HTTPMethodNotAllowed,
+                       HTTPMovedPermanently)
 
 from services.cef import log_failure
 from synccore.util import convert_config, filter_params
@@ -78,6 +79,7 @@ class KeyExchangeApp(object):
         self.config = config
         self.cid_len = config.get('keyexchange.cid_len', 4)
         self.ttl = config.get('keyexchange.ttl', 300)
+        self.root = self.config.get('keyexchange.root_redirect')
         servers = config.get('keyexchange.cache_servers', ['127.0.0.1:11211'])
         if isinstance(servers, str):
             self.cache_servers = [servers]
@@ -110,6 +112,13 @@ class KeyExchangeApp(object):
         client_id = request.headers.get('X-KeyExchange-Id')
         method = request.method
         url = request.path_info
+
+        # the root redirects to services.mozilla.com
+        if url == '/':
+            if method != 'GET':
+                raise HTTPMethodNotAllowed()
+            raise HTTPMovedPermanently(location=self.root)
+
         match = _URL.match(url)
         if match is None:
             raise HTTPNotFound()
