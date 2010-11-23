@@ -427,6 +427,11 @@ class TestWsgiApp(unittest.TestCase):
 
     def test_root(self):
         # the root must redirect to https://services.mozilla.com/
-
         res = self.app.get('/', status=301, extra_environ=self.env)
         self.assertEqual(res.location, 'https://services.mozilla.com')
+
+        # the root also performs a health check on memcached.
+        # if memcached fails to get/set/delete a test key,
+        # a 503 is returned
+        self.app.app.app.cache.add = lambda x, y: False
+        res = self.app.get('/', status=503, extra_environ=self.env)

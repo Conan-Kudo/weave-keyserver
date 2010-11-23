@@ -41,6 +41,7 @@ import re
 from hashlib import md5
 import json
 import time
+import random
 
 from webob.dec import wsgify
 from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
@@ -106,6 +107,21 @@ class KeyExchangeApp(object):
 
         return new_cid
 
+    def _health_check(self):
+        """Checks that memcache is up and works as expected"""
+        rand = ''.join([random.choice('abcdefgh1234567') for i in range(50)])
+        key = 'test_%s' % rand
+        success = self.cache.add(key, 'test')
+        if not success:
+            raise HTTPServiceUnavailable()
+        stored = self.cache.get(key)
+        if stored != 'test':
+            raise HTTPServiceUnavailable()
+        self.cache.delete(key)
+        stored = self.cache.get(key)
+        if stored is not None:
+            raise HTTPServiceUnavailable()
+
     @wsgify
     def __call__(self, request):
         request.config = self.config
@@ -113,10 +129,12 @@ class KeyExchangeApp(object):
         method = request.method
         url = request.path_info
 
-        # the root redirects to services.mozilla.com
+        # the root does a health check on memcached, then
+        # redirects to services.mozilla.com
         if url == '/':
             if method != 'GET':
                 raise HTTPMethodNotAllowed()
+            self._health_check()
             raise HTTPMovedPermanently(location=self.root)
 
         match = _URL.match(url)
