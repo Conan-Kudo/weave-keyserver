@@ -1,4 +1,3 @@
-include development.ini
 include README.txt
 recursive-include etc *
 include setup.cfg
