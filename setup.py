@@ -44,7 +44,8 @@ main = keyexchange.wsgiapp:make_app
 main = paste.script.appinstall:Installer
 """
 
-requires = ['WebOb', 'Paste', 'PasteScript', 'SyncCore', 'Mako']
+requires = ['WebOb==1.0', 'Paste==1.7.5.1', 'PasteScript==1.7.3',
+            'SyncCore==0.1', 'Mako==0.3.4']
 
 class _bdist_rpm(bdist_rpm):
     def _make_spec_file(self):

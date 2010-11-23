@@ -53,16 +53,16 @@ lint:
 build_rpms:
 	rm -rf $(CURDIR)/rpms
 	mkdir $(CURDIR)/rpms
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms webob
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms paste
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastedeploy
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastescript
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms mako
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms markupsafe
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms webob --version=1.0
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms paste --version=1.7.5.1
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastedeploy --version=1.3.4
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastescript --version=1.7.3
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms mako --version=0.3.4
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms markupsafe --version=0.11
 	rm -rf build; $(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=KeyExchange.spec --dist-dir=$(CURDIR)/rpms --binary-only
 
 build_core:
 	cd deps/server-core; rm -rf build; ../../$(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=SyncCore.spec --dist-dir=$(CURDIR)/rpms --binary-only
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms simplejson
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms routes
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms sqlalchemy
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms simplejson --version=2.1.1
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms routes --version=1.12.3
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms sqlalchemy --version=0.6.4
