@@ -54,6 +54,7 @@ from collections import deque
 from mako.template import Template
 from webob.dec import wsgify
 
+from keyexchange.filtering.IPy import IP
 from keyexchange.util import get_memcache_class
 from keyexchange.filtering.blacklist import Blacklist
 
@@ -113,7 +114,7 @@ class IPFiltering(object):
                  queue_size=200, br_queue_size=20, treshold=20,
                  br_treshold=5, cache_servers=['127.0.0.0.1:11211'],
                  admin_page=None, use_memory=False, refresh_frequency=1,
-                 observe=False, callback=None):
+                 observe=False, callback=None, ip_whitelist=None):
 
         """Initializes the middleware.
 
@@ -133,6 +134,8 @@ class IPFiltering(object):
           queue.
         - callback: callable that will be called with an IP that is added
           in the blacklist.
+        - ip_whitelist: a list of IP that should never be blacklisted.
+          Supports all netmask notations.
         """
         self.app = app
         self.blacklist_ttl = blacklist_ttl
@@ -154,8 +157,24 @@ class IPFiltering(object):
         admin_mako = os.path.join(os.path.dirname(__file__), 'admin.mako')
         self._admin_tpl = Template(filename=admin_mako)
         self.callback = callback
+        if ip_whitelist is None:
+            self.ip_whitelist = []
+        else:
+            self.ip_whitelist = [IP(ip) for ip in ip_whitelist]
+
+    def _is_whitelisted(self, ip):
+        for ip_range in self.ip_whitelist:
+            try:
+                if ip in ip_range:
+                    return True
+            except ValueError:
+                # happens when the IP is unparseable
+                return False
+        return False
 
     def _check_ip(self, ip, environ):
+        if self._is_whitelisted(ip):
+            return
         # insert the IP in the queue
         # if the queue is full, the opposite-end item is discarded
         self._last_ips.append(ip)
@@ -168,6 +187,8 @@ class IPFiltering(object):
                 self.callback(ip, environ)
 
     def _inc_bad_request(self, ip, environ):
+        if self._is_whitelisted(ip):
+            return
         # insert the IP in the br queue
         # if the queue is full, the opposite-end item is discarded
         self._last_br_ips.append(ip)

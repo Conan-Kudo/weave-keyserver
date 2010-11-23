@@ -64,7 +64,9 @@ class TestIPFiltering(unittest.TestCase):
         # this setting will blacklist an IP that does more than 5 calls
         app = IPFiltering(FakeApp(), queue_size=10, blacklist_ttl=.5,
                           treshold=5, br_queue_size=3,
-                          br_blacklist_ttl=.5, use_memory=True)
+                          br_blacklist_ttl=.5, use_memory=True,
+                          ip_whitelist=['192.168/16', '127.0/8', '10/8'])
+
         self.app = TestApp(app)
 
     def test_reached_max_observe(self):
@@ -85,7 +87,7 @@ class TestIPFiltering(unittest.TestCase):
         self.app.get('/', status=200, extra_environ=env)
 
     def test_reached_max(self):
-        env = {'REMOTE_ADDR': '127.0.0.1'}
+        env = {'REMOTE_ADDR': '193.0.0.1'}
 
         # no ip, no chocolate
         try:
@@ -113,7 +115,7 @@ class TestIPFiltering(unittest.TestCase):
 
     def test_reached_br_max(self):
         self.app.app.br_treshold = 3
-        env = {'REMOTE_ADDR': '127.0.0.1'}
+        env = {'REMOTE_ADDR': '167.0.0.1'}
 
         # doing 3 calls
         for i in range(3):
@@ -233,3 +235,14 @@ class TestIPFiltering(unittest.TestCase):
         # and the IP should also be removed from the IP queues
         self.assertTrue('myip' not in self.app.app._last_ips)
         self.assertTrue('myip' not in self.app.app._last_br_ips)
+
+    def test_ip_whitelist(self):
+        env = {'REMOTE_ADDR': '127.0.0.1'}
+
+        # doing 5 calls
+        for i in range(5):
+            self.app.get('/', status=200, extra_environ=env)
+
+        # they should be discarded
+        self.assertTrue('127.0.0.1' not in self.app.app._last_ips)
+        self.assertTrue('127.0.0.1' not in self.app.app._last_br_ips)
