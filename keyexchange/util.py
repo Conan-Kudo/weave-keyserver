@@ -36,14 +36,21 @@
 """ Various helpers.
 """
 import json
-import random
 
 from webob import Response
 
 CID_CHARS = '23456789abcdefghijkmnpqrstuvwxyz'
 
-# initialize the random seed. This will use os.urandom()
-random.seed()
+try:
+    from os import urandom
+    def _randchar():
+        return CID_CHARS[ord(urandom(1)) % len(CID_CHARS)]
+except ImportError:
+    import random
+    random.seed()
+    def _randchar():
+        return random.choice(CID_CHARS)
+
 
 def json_response(data, dump=True, **kw):
     """Returns Response containing a json string"""
@@ -54,7 +61,7 @@ def json_response(data, dump=True, **kw):
 
 def generate_cid(size=4):
     """Returns a random channel id."""
-    return ''.join([random.choice(CID_CHARS) for i in range(size)])
+    return ''.join([_randchar() for i in range(size)])
 
 
 class MemoryClient(dict):
