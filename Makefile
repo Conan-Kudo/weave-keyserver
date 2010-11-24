@@ -59,6 +59,7 @@ build_rpms:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastescript --version=1.7.3
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms mako --version=0.3.4
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms markupsafe --version=0.11
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms beaker --version=1.5.4
 	rm -rf build; $(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=KeyExchange.spec --dist-dir=$(CURDIR)/rpms --binary-only
 
 build_core:
