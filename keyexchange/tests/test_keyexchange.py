@@ -237,15 +237,17 @@ class TestWsgiApp(unittest.TestCase):
                      extra_environ=self.env)
         self.app.get('/boo', status=404, headers=headers,
                      extra_environ=self.env)
-        self.app.delete('/boo', status=404, headers=headers,
-                        extra_environ=self.env)
 
         # testing the removal of a channel
         res = self.app.get('/new_channel', headers=headers,
                            extra_environ=self.env)
         cid = str(json.loads(res.body))
         curl = '/%s' % cid
-        self.app.delete(curl, headers=headers, extra_environ=self.env)
+
+        headers['X-KeyExchange-Cid'] = cid
+        self.app.post('/report', headers=headers, extra_environ=self.env)
+        del headers['X-KeyExchange-Cid']
+
         self.app.put(curl,  params='somedata', status=404, headers=headers,
                      extra_environ=self.env)
         self.app.get(curl, status=404, headers=headers,
@@ -362,17 +364,25 @@ class TestWsgiApp(unittest.TestCase):
         def _counter(log, *args, **kw):
             logs.append(log)
 
-        # let's delete it with a log message
+        # the channel is present
+        self.app.get(curl, status=200, headers=headers,
+                     extra_environ=self.env)
+
+        # let's report a log message (and ask for deletion)
         old = wsgiapp.log_failure
         wsgiapp.log_failure = _counter
         try:
             headers['X-KeyExchange-Log'] = 'my log'
-            self.app.delete(curl, headers=headers,
-                            extra_environ=self.env)
+            headers['X-KeyExchange-Cid'] = cid
+            self.app.post('/report', headers=headers, extra_environ=self.env)
         finally:
             wsgiapp.log_failure = old
 
-        self.assertEqual(logs[0], 'my log')
+        self.assertEqual(logs[0].strip(), 'my log')
+
+        # the channel should be gone
+        self.app.get(curl, status=404, headers=headers,
+                     extra_environ=self.env)
 
         # let's see if the real callback is correctly called
         self.app.app.br_treshold = 2
@@ -435,3 +445,18 @@ class TestWsgiApp(unittest.TestCase):
         # a 503 is returned
         self.app.app.app.cache.add = lambda x, y: False
         res = self.app.get('/', status=503, extra_environ=self.env)
+
+    def test_max_gets(self):
+        headers = {'X-KeyExchange-Id': 'b' * 256}
+        res = self.app.get('/new_channel', status=200,
+                           headers=headers, extra_environ=self.env)
+        cid = str(json.loads(res.body))
+        curl = '/%s' % cid
+        # 6 gets max !
+        for i in range(6):
+            self.app.get(curl, status=200, extra_environ=self.env,
+                         headers=headers)
+
+        # the channel should be gone now
+        self.app.get(curl, status=404, extra_environ=self.env,
+                     headers=headers)

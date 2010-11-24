@@ -59,7 +59,6 @@ from keyexchange.filtering import IPFiltering
 _URL = re.compile('^/(new_channel|report|[%s]+)/?$' % CID_CHARS)
 _CPREFIX = 'keyexchange:'
 _INC_KEY = '%schannel_id' % _CPREFIX
-_NOT_FOUND, _FAILED, _SUCCESS = range(3)
 _DELETE_LOG = 'DeleteLog'
 _INVALID_CID = 'InvalidChannelId'
 _INVALID_UID = 'InvalidClientId'
@@ -80,6 +79,7 @@ class KeyExchangeApp(object):
         self.config = config
         self.cid_len = config.get('keyexchange.cid_len', 4)
         self.ttl = config.get('keyexchange.ttl', 300)
+        self.max_gets = config.get('keyexchange.max_gets', 6)
         self.root = self.config.get('keyexchange.root_redirect')
         servers = config.get('keyexchange.cache_servers', ['127.0.0.1:11211'])
         if isinstance(servers, str):
@@ -160,7 +160,7 @@ class KeyExchangeApp(object):
         elif url == 'report':
             if method != 'POST':
                 raise HTTPMethodNotAllowed()
-            return self.report(request)
+            return self.report(request, client_id)
 
         # validating the client id - or registering id #2
         channel_content = self._check_client_id(url, client_id, request)
@@ -190,7 +190,11 @@ class KeyExchangeApp(object):
                             signature=_INVALID_UID)
             finally:
                 # we need to kill the channel
-                self._delete_channel(channel_id)
+                if not self._delete_channel(channel_id):
+                    log_failure('Could not delete channel "%s"' % channel_id,
+                                5, request.environ, self.config,
+                                signature=_DELETE_LOG)
+
                 raise HTTPBadRequest()
 
         content = self.cache.get(channel_id)
@@ -218,7 +222,11 @@ class KeyExchangeApp(object):
                 log_failure(log, 5, request.environ, self.config,
                             signature=_UNKNOWN_UID)
             finally:
-                self._delete_channel(channel_id)
+                if not self._delete_channel(channel_id):
+                    log_failure('Could not delete channel "%s"' % channel_id,
+                                5, request.environ, self.config,
+                                signature=_DELETE_LOG)
+
                 raise HTTPBadRequest()
 
         content = ttl, ids, data, etag
@@ -255,43 +263,60 @@ class KeyExchangeApp(object):
                 etag in request.if_none_match.etags):
                 raise HTTPNotModified()
 
-        return json_response(data, dump=False, etag=etag)
+        # keep the GET counter up-to-date
+        # the counter is a separate key
+        deletion = False
+        ckey = 'GET:%s' % channel_id
+        count = self.cache.get(ckey)
+        if count is None:
+            self.cache.set(ckey, '1')
+        else:
+            if int(count) + 1 == self.max_gets:
+                deletion = True
+            else:
+                self.cache.inc(ckey)
+        try:
+            return json_response(data, dump=False, etag=etag)
+        finally:
+            # deleting the channel in case we did all GETs
+            if deletion:
+                self.cache.delete(ckey)
+                if not self._delete_channel(channel_id):
+                    log_failure('Could not delete channel "%s"' % channel_id,
+                                5, request.environ, self.config,
+                                signature=_DELETE_LOG)
 
     def _delete_channel(self, channel_id):
         res = self.cache.get(channel_id)
         if res is None:
-            return _NOT_FOUND
-        res = self.cache.delete(channel_id)
-        if not res:
-            # failed to delete
-            return _FAILED
-        return _SUCCESS
-
-    def delete_channel(self, request, channel_id, channel_content):
-        """Delete a channel."""
-        res = self._delete_channel(channel_id)
-        if res == _NOT_FOUND:
-            raise HTTPNotFound()
-        elif res == _FAILED:
-            raise HTTPServiceUnavailable()
-
-        # log a message, if any is provided in the X-KeyExchange-Log header
-        log = request.headers.get('X-KeyExchange-Log')
-        if log is not None:
-            log_failure(log, 5, request.environ, self.config,
-                        signature=_DELETE_LOG)
-
-        return json_response('')
+            return True   # already gone
+        return self.cache.delete(channel_id)
 
     def blacklisted(self, ip, environ):
         log_failure('%s blacklisted' % ip, 5, environ, self.config,
                     signature=_BLACKLISTED)
 
-    def report(self, request):
-        """Reports a log."""
+    def report(self, request, client_id):
+        """Reports a log and delete the channel if relevant"""
+        # logging the report
         log = request.headers.get('X-KeyExchange-Log', '')
         log += '\n%s' % request.body[:2000]
         log_failure(log, 5, request.environ, self.config, signature=_REPORT)
+
+        # removing the channel if present
+        channel_id = request.headers.get('X-KeyExchange-Cid')
+        if client_id is not None and channel_id is not None:
+            content = self.cache.get(channel_id)
+            if content is not None:
+                # the channel is still existing
+                ttl, ids, data, etag = content
+
+                # if the client_ids is in ids, we allow the deletion
+                # of the channel
+                if not self._delete_channel(channel_id):
+                    log_failure('Could not delete channel "%s"' % channel_id,
+                                5, request.environ, self.config,
+                                signature=_DELETE_LOG)
         return json_response('')
 
 
