@@ -94,7 +94,7 @@ class MemoryClient(dict):
         del self[key]
         return True
 
-    def inc(self, key):
+    def incr(self, key):
         val = self[key]
         self[key] = str(int(val) + 1)
 
@@ -104,8 +104,8 @@ class PrefixedCache(object):
         self.cache = cache
         self.prefix = ''
 
-    def inc(self, key):
-        return self.cache.inc(self.prefix + key)
+    def incr(self, key):
+        return self.cache.incr(self.prefix + key)
 
     def get(self, key):
         return self.cache.get(self.prefix + key)

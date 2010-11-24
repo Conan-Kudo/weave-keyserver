@@ -274,7 +274,7 @@ class KeyExchangeApp(object):
             if int(count) + 1 == self.max_gets:
                 deletion = True
             else:
-                self.cache.inc(ckey)
+                self.cache.incr(ckey)
         try:
             return json_response(data, dump=False, etag=etag)
         finally:
