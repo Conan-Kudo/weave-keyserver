@@ -45,7 +45,7 @@ try:
     from os import urandom
     def _randchar():
         return CID_CHARS[ord(urandom(1)) % len(CID_CHARS)]
-except ImportError:
+except NotImplementedError:
     import random
     random.seed()
     def _randchar():
