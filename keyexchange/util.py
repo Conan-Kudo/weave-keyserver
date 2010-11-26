@@ -36,20 +36,11 @@
 """ Various helpers.
 """
 import json
-
 from webob import Response
+from synccore.util import randchar
+
 
 CID_CHARS = '23456789abcdefghijkmnpqrstuvwxyz'
-
-try:
-    from os import urandom
-    def _randchar():
-        return CID_CHARS[ord(urandom(1)) % len(CID_CHARS)]
-except NotImplementedError:
-    import random
-    random.seed()
-    def _randchar():
-        return random.choice(CID_CHARS)
 
 
 def json_response(data, dump=True, **kw):
@@ -61,7 +52,7 @@ def json_response(data, dump=True, **kw):
 
 def generate_cid(size=4):
     """Returns a random channel id."""
-    return ''.join([_randchar() for i in range(size)])
+    return ''.join([randchar(CID_CHARS) for i in range(size)])
 
 
 class MemoryClient(dict):
