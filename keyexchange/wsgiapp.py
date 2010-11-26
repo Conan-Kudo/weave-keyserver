@@ -49,7 +49,7 @@ from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
                        HTTPMovedPermanently)
 
 from services.cef import log_failure
-from synccore.util import convert_config, filter_params
+from services.util import convert_config, filter_params
 
 from keyexchange.util import (generate_cid, json_response, CID_CHARS,
                               PrefixedCache, get_memcache_class)

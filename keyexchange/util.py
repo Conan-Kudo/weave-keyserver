@@ -37,7 +37,7 @@
 """
 import json
 from webob import Response
-from synccore.util import randchar
+from services.util import randchar
 
 
 CID_CHARS = '23456789abcdefghijkmnpqrstuvwxyz'
