@@ -68,3 +68,4 @@ build_core:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms simplejson --version=2.1.1
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms routes --version=1.12.3
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms sqlalchemy --version=0.6.4
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms mysql-python --version=1.2.3
