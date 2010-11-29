@@ -3,7 +3,7 @@
 %define version 0.1
 %define unmangled_version 0.1
 %define unmangled_version 0.1
-%define release 7
+%define release 8
 
 Summary: Key Exchange server
 Name: %{name}
@@ -16,7 +16,8 @@ BuildRoot: %{_tmppath}/%{pythonname}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
 Vendor: Tarek Ziade <tarek@mozilla.com>
-Requires: nginx memcached gunicorn python26 pylibmc python26-setuptools python26-webob python26-paste python26-pastedeploy python26-pastescript python26-services python26-mako python26-beaker
+Requires: nginx memcached gunicorn python26 python26-memcached python26-setuptools python26-webob python26-paste python26-pastedeploy python26-pastescript python26-services python26-mako python26-beaker
+Conflicts: python26-pylibmc
 
 Url: https://hg.mozilla.org/services/server-key-exchange
 
