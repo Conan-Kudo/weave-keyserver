@@ -115,7 +115,7 @@ class TestIPFiltering(unittest.TestCase):
 
     def test_reached_br_max(self):
         self.app.app.br_treshold = 3
-        env = {'REMOTE_ADDR': '167.0.0.1'}
+        env = {'HTTP_X_FORWARDED_FOR': '167.0.0.1, 10.1.1.2, 10.12.12.1'}
 
         # doing 3 calls
         for i in range(3):

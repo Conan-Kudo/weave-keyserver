@@ -58,9 +58,6 @@ from keyexchange.filtering.IPy import IP
 from keyexchange.util import get_memcache_class
 from keyexchange.filtering.blacklist import Blacklist
 
-# Make sure we get the IP from any proxy or loadbalancer, if any is used
-_IP_HEADERS = ('X_FORWARDED_FOR', 'REMOTE_ADDR')
-
 
 class IPQueue(deque):
     """IP Queue that keeps a counter for each IP.
@@ -241,10 +238,12 @@ class IPFiltering(object):
             return start_response(status, headers, exc_info)
 
         # what's the remote ip ?
-        for header in _IP_HEADERS:
-            ip = environ.get(header)
-            if ip is not None:
-                break
+        if 'HTTP_X_FORWARDED_FOR' in environ:
+            ip = environ['HTTP_X_FORWARDED_FOR'].split(',')[0].strip()
+        elif 'REMOTE_ADDR' in environ:
+            ip = environ['REMOTE_ADDR']
+        else:
+            ip = None
 
         if ip is None or (ip in self._blacklisted and not self.observe):
             # returning a 403
