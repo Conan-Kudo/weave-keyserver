@@ -115,9 +115,5 @@ def get_memcache_class(memory=False):
     """Returns the memcache class."""
     if memory:
         return MemoryClient
-    try:
-        import pylibmc
-        return pylibmc.Client
-    except (ImportError, RuntimeError):
-        import memcache
-        return memcache.Client
+    import memcache
+    return memcache.Client
