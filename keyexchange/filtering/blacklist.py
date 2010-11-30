@@ -71,6 +71,7 @@ class _Syncer(threading.Thread):
             except Exception, e:
                 # in case something goes wrong
                 # we log it but don't want our thread to die.
+                from keyexchange.filtering import logger
                 logger.error(str(e))
 
             time.sleep(self.frequency)

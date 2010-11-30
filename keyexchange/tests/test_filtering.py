@@ -246,3 +246,13 @@ class TestIPFiltering(unittest.TestCase):
         # they should be discarded
         self.assertTrue('127.0.0.1' not in self.app.app._last_ips)
         self.assertTrue('127.0.0.1' not in self.app.app._last_br_ips)
+
+    def test_blacklist_dies(self):
+        # testing the thread-safeness of Blacklist
+        cache = MemoryClient(None)
+        blacklist = Blacklist(cache)
+        def raiseit():
+            raise ValueError()
+        blacklist.save = blacklist.update = raiseit
+        # make sure the logging happens and the thread does not die
+        time.sleep(0.5)
