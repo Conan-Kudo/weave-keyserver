@@ -336,14 +336,14 @@ def make_app(global_conf, **app_conf):
                                             flush_at_shutdown=True,
                                             path='/__profile__')
 
-    # hooking a debugger
-    if global_conf.get('debug', 'false').lower() == 'true':
+    # hooking a client debugger
+    if global_conf.get('client_debug', 'false').lower() == 'true':
         from paste.exceptions.errormiddleware import ErrorMiddleware
         app = ErrorMiddleware(app, debug=True,
                               show_exceptions_in_wsgi_errors=True)
 
-    # hooking a logger
-    if global_conf.get('translogger', 'false').lower() == 'true':
+    # hooking a stdout logger
+    if global_conf.get('debug', 'false').lower() == 'true':
         from paste.translogger import TransLogger
         app = TransLogger(app, logger_name='jpakeapp',
                           setup_console_handler=True)
