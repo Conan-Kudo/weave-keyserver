@@ -93,10 +93,14 @@ class KeyExchangeApp(object):
     def _get_new_cid(self, client_id):
         tries = 0
         ttl = time.time() + self.ttl
-        content = ttl, [client_id], json.dumps({}), None
+        content = ttl, [client_id], '{}', None
 
         while tries < 100:
             new_cid = generate_cid(self.cid_len)
+            if self.cache.get(new_cid) is not None:
+                tries += 1
+                continue   # already taken
+
             success = self.cache.add(new_cid, content, time=ttl)
             if success:
                 break
@@ -271,7 +275,7 @@ class KeyExchangeApp(object):
         if count is None:
             self.cache.set(ckey, '1')
         else:
-            if int(count) + 1 == self.max_gets:
+            if int(count) > self.max_gets:
                 deletion = True
             else:
                 self.cache.incr(ckey)
@@ -280,13 +284,13 @@ class KeyExchangeApp(object):
         finally:
             # deleting the channel in case we did all GETs
             if deletion:
-                self.cache.delete(ckey)
                 if not self._delete_channel(channel_id):
                     log_failure('Could not delete channel "%s"' % channel_id,
                                 5, request.environ, self.config,
                                 signature=_DELETE_LOG)
 
     def _delete_channel(self, channel_id):
+        self.cache.delete('GET:%s' % channel_id)
         res = self.cache.get(channel_id)
         if res is None:
             return True   # already gone
