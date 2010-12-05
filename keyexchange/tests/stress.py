@@ -203,16 +203,23 @@ class StressTest(FunkLoadTestCase):
     def release(self):
         self.lock.release()
 
-    def test_channel_creation(self):
+    def test_channel_put_get(self):
         hash = hashlib.sha256(str(random.randint(1, 1000))).hexdigest()
         self.setHeader('X-KeyExchange-Id', hash * 4)
         res = self.get(self.root + '/new_channel')
         cid = str(json.loads(res.body))
         curl = self.root + '/' + cid
-        data = json.dumps('*' * 200)
-        self.put(curl, Data('application/json', data))
-        res = self.get(curl)
-        self.assertEquals(res.body, data)
+        try:
+            for i in range(4):
+                data = json.dumps('*' * 200 + str(time.time()))
+                self.put(curl, Data('application/json', data))
+                res = self.get(curl)
+                self.assertEquals(res.body, data)
+        finally:
+            try:
+                self.get(curl)
+            except Exception:
+                self.delete(curl)
 
     def test_DoS(self):
         hash = hashlib.sha256(str(random.randint(1, 1000))).hexdigest()
