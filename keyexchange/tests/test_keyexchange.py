@@ -452,10 +452,28 @@ class TestWsgiApp(unittest.TestCase):
                            headers=headers, extra_environ=self.env)
         cid = str(json.loads(res.body))
         curl = '/%s' % cid
+
+        # getting the etag
+        res = self.app.put(curl, headers=headers, extra_environ=self.env,
+                           params='xxx')
+        etag = res.headers['ETag']
+        headers2 = dict(headers)
+        headers2['If-None-Match'] = res.headers['ETag']
+        # this should not increment the counter (poll)
+        # and generate a 304
+        for i in range(4):
+            self.app.get(curl, status=304, extra_environ=self.env,
+                         headers=headers2)
+
+        cache = self.app.app.app.cache
+
         # 6 gets max !
         for i in range(6):
             self.app.get(curl, status=200, extra_environ=self.env,
                          headers=headers)
+
+            if i < 5:
+                self.assertEqual(cache.get('GET:%s' % cid), str(i + 1))
 
         # the channel should be gone now
         self.app.get(curl, status=404, extra_environ=self.env,

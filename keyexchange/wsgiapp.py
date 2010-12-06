@@ -275,10 +275,13 @@ class KeyExchangeApp(object):
         if count is None:
             self.cache.set(ckey, '1')
         else:
-            if int(count) > self.max_gets:
+            if int(count) + 1 == self.max_gets:
+                # we reached the last authorized call, the channel is remove
+                # after that
                 deletion = True
             else:
                 self.cache.incr(ckey)
+
         try:
             return json_response(data, dump=False, etag=etag)
         finally:
