@@ -89,15 +89,17 @@ class Blacklist(object):
     IPs are saved/loaded from Memcached so several apps can share the
     blacklist.
     """
-    def __init__(self, cache_server=None, frequency=5):
+    def __init__(self, cache_server=None, frequency=5, async=True):
         self._ttls = {}
         self._cache_server = cache_server
         self.ips = set()
         self._dirty = False
         self._lock = threading.RLock()
-        self._syncer = _Syncer(self, frequency=frequency)
-        # sys.exit() call all threads join() in >= 2.6.5
-        self._syncer.start()
+        self.async = async
+        if self.async:
+            self._syncer = _Syncer(self, frequency=frequency)
+            # sys.exit() call all threads join() in >= 2.6.5
+            self._syncer.start()
 
     def _get_dirty(self):
         # hiding it behind a property since
@@ -134,7 +136,8 @@ class Blacklist(object):
             tries = 0
             while tries < 10:
                 data = self.ips, self._ttls
-                if self._cache_server.cas('keyexchange:blacklist', data):
+                #if self._cache_server.cas('keyexchange:blacklist', data):
+                if self._cache_server.set('keyexchange:blacklist', data):
                     self._dirty = False
                     break
                 self.update()  # reload

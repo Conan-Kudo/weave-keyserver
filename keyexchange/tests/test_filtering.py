@@ -62,10 +62,17 @@ class TestIPFiltering(unittest.TestCase):
 
     def setUp(self):
         # this setting will blacklist an IP that does more than 5 calls
-        app = IPFiltering(FakeApp(), queue_size=10, blacklist_ttl=.5,
-                          treshold=5, br_queue_size=3,
-                          br_blacklist_ttl=.5, use_memory=True,
-                          ip_whitelist=['192.168/16', '127.0/8', '10/8'])
+        if random.randrange(2) == 1:
+            app = IPFiltering(FakeApp(), queue_size=10, blacklist_ttl=.5,
+                              treshold=5, br_queue_size=3,
+                              br_blacklist_ttl=.5, use_memory=True,
+                              ip_whitelist=['192.168/16', '127.0/8', '10/8'])
+        else:
+            app = IPFiltering(FakeApp(), queue_size=10, blacklist_ttl=.5,
+                              treshold=5, br_queue_size=3,
+                              br_blacklist_ttl=.5, use_memory=True,
+                              ip_whitelist=['192.168/16', '127.0/8', '10/8'],
+                              async=False, update_blfreq=2)
 
         self.app = TestApp(app)
 
@@ -256,3 +263,31 @@ class TestIPFiltering(unittest.TestCase):
         blacklist.save = blacklist.update = raiseit
         # make sure the logging happens and the thread does not die
         time.sleep(0.5)
+
+    def test_sync(self):
+        app = IPFiltering(FakeApp(), queue_size=10, blacklist_ttl=.5,
+                          treshold=5, br_queue_size=3,
+                          br_blacklist_ttl=.5, use_memory=True,
+                          ip_whitelist=['192.168/16', '127.0/8', '10/8'],
+                           async=False, update_blfreq=2)
+
+        # make sure the bl is getting updated on synchronous mode
+        counter = [0]
+        def _incr():
+            counter[0] += 1
+
+        old_save = app._blacklisted.save
+        old_update = app._blacklisted.update
+        app._blacklisted.save = app._blacklisted.update = _incr
+        env = {'REMOTE_ADDR': '127.0.0.1'}
+        web_app = TestApp(app)
+
+        try:
+            # doing 10 calls
+            for i in range(5):
+                web_app.get('/', status=200, extra_environ=env)
+        finally:
+            app._blacklisted.save = old_save
+            app._blacklisted.update = old_update
+
+        self.assertEqual(counter[0], 2)

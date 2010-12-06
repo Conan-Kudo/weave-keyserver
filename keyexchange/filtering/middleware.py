@@ -111,7 +111,8 @@ class IPFiltering(object):
                  queue_size=200, br_queue_size=20, treshold=20,
                  br_treshold=5, cache_servers=['127.0.0.0.1:11211'],
                  admin_page=None, use_memory=False, refresh_frequency=1,
-                 observe=False, callback=None, ip_whitelist=None):
+                 observe=False, callback=None, ip_whitelist=None,
+                 async=True, update_blfreq=None):
 
         """Initializes the middleware.
 
@@ -133,6 +134,10 @@ class IPFiltering(object):
           in the blacklist.
         - ip_whitelist: a list of IP that should never be blacklisted.
           Supports all netmask notations.
+        - async: if True, uses a thread to sync the blacklist. Otherwise
+          updates it every update_blfreq requests.
+        - update_blfreq: number of requests before the blacklist is updated.
+          async must be False.
         """
         self.app = app
         self.blacklist_ttl = blacklist_ttl
@@ -147,7 +152,13 @@ class IPFiltering(object):
         if isinstance(cache_servers, str):
             cache_servers = [cache_servers]
         self._cache_server = get_memcache_class(use_memory)(cache_servers)
-        self._blacklisted = Blacklist(self._cache_server, refresh_frequency)
+        self.async = async
+        if self.async and update_blfreq is not None:
+            raise ValueError('Cannot use async mode with update_blfreq')
+        self.update_blfreq = update_blfreq
+        self._blcounter = 0
+        self._blacklisted = Blacklist(self._cache_server, refresh_frequency,
+                                      self.async)
         if admin_page is not None and not admin_page.startswith('/'):
             admin_page = '/' + admin_page
         self.admin_page = admin_page
@@ -250,6 +261,20 @@ class IPFiltering(object):
             headers = [('Content-Type', 'text/plain')]
             start_response('403 Forbidden', headers)
             return ["Forbidden: You don't have permission to access"]
+
+        # updating the blacklist on sync mode
+        if not self.async:
+            self._blcounter += 1
+            if self._blcounter >= self.update_blfreq:
+                self._blcounter = 0
+                try:
+                    if self._blacklisted.outsynced:
+                        self._blacklisted.save()
+                    else:
+                        self._blacklisted.update()
+                except Exception, e:
+                    from keyexchange.filtering import logger
+                    logger.error(str(e))
 
         # checking for the IP in our counter
         self._check_ip(ip, environ)
