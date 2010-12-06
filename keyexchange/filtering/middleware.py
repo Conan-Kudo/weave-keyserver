@@ -49,59 +49,13 @@ Blacklisted IPs are kept in memory with a TTL.
 """
 import os
 import cgi
-from collections import deque
 
 from mako.template import Template
-from webob.dec import wsgify
 
 from keyexchange.filtering.IPy import IP
 from keyexchange.util import get_memcache_class
 from keyexchange.filtering.blacklist import Blacklist
-
-
-class IPQueue(deque):
-    """IP Queue that keeps a counter for each IP.
-
-    When an IP comes in, it's append in the left and the counter
-    initialized to 1.
-
-    If the IP is already in the queue, its counter is incremented,
-    and it's moved back to the left.
-
-    When the queue is full, the right element is discarded.
-    """
-    def __init__(self, maxlen=200):
-        self._ips = deque()
-        self._counter = dict()
-        self._maxlen = maxlen
-
-    def append(self, ip):
-        """Adds the IP and raise the counter accordingly."""
-        if ip not in self._ips:
-            self._ips.appendleft(ip)
-            self._counter[ip] = 1
-        else:
-            self._ips.remove(ip)
-            self._ips.appendleft(ip)
-            self._counter[ip] += 1
-
-        if len(self._ips) > self._maxlen:
-            ip = self._ips.pop()
-            del self._counter[ip]
-
-    def count(self, ip):
-        """Returns the IP count."""
-        return self._counter.get(ip, 0)
-
-    def __len__(self):
-        return len(self._ips)
-
-    def __contains__(self, ip):
-        return ip in self._ips
-
-    def remove(self, ip):
-        self._ips.remove(ip)
-        del self._counter[ip]
+from keyexchange.filtering.ipqueue import IPQueue
 
 
 class IPFiltering(object):
@@ -112,7 +66,7 @@ class IPFiltering(object):
                  br_treshold=5, cache_servers=['127.0.0.0.1:11211'],
                  admin_page=None, use_memory=False, refresh_frequency=1,
                  observe=False, callback=None, ip_whitelist=None,
-                 async=True, update_blfreq=None):
+                 async=True, update_blfreq=None, ip_queue_ttl=360):
 
         """Initializes the middleware.
 
@@ -138,6 +92,7 @@ class IPFiltering(object):
           updates it every update_blfreq requests.
         - update_blfreq: number of requests before the blacklist is updated.
           async must be False.
+        - ip_queue_ttl: Maximum time to live for an IP in the queues.
         """
         self.app = app
         self.blacklist_ttl = blacklist_ttl
@@ -147,8 +102,8 @@ class IPFiltering(object):
         self.treshold = treshold
         self.br_treshold = br_treshold
         self.observe = observe
-        self._last_ips = IPQueue(queue_size)
-        self._last_br_ips = IPQueue(br_queue_size)
+        self._last_ips = IPQueue(queue_size, ttl=ip_queue_ttl)
+        self._last_br_ips = IPQueue(br_queue_size, ttl=ip_queue_ttl)
         if isinstance(cache_servers, str):
             cache_servers = [cache_servers]
         self._cache_server = get_memcache_class(use_memory)(cache_servers)

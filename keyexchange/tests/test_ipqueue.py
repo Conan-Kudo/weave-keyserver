@@ -33,7 +33,26 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-import logging
-from keyexchange.filtering.middleware import IPFiltering  # NOQA
+import unittest
+import time
 
-logger = logging.getLogger('ipfiltering')
+from keyexchange.filtering.ipqueue import IPQueue
+
+
+class TestIPQueue(unittest.TestCase):
+
+    def test_ttl(self):
+        # we want to discard IP that are in the queue for too long
+        queue = IPQueue(ttl=.5)
+
+        for ip in ('ip1', 'ip2', 'ip2', 'ip3', 'ip1'):
+            queue.append(ip)
+
+        self.assertEqual(queue.count('ip2'), 2)
+
+        time.sleep(0.6)
+        self.assertEqual(queue.count('ip2'), 0)
+
+        for ip in ('ip1', 'ip2'):
+            queue.append(ip)
+        self.assertEqual(queue.count('ip2'), 1)
