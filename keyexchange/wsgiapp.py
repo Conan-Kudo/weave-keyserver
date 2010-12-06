@@ -39,7 +39,6 @@ KeyExchange server - see https://wiki.mozilla.org/Services/Sync/SyncKey/J-PAKE
 import datetime
 import re
 from hashlib import md5
-import json
 import time
 import random
 
@@ -338,10 +337,10 @@ def make_app(global_conf, **app_conf):
     if global_conf.get('profile', 'false').lower() == 'true':
         from repoze.profile.profiler import AccumulatingProfileMiddleware
         app = AccumulatingProfileMiddleware(app, log_filename='profile.log',
-                                            cachegrind_filename='cachegrind.out',
-                                            discard_first_request=True,
-                                            flush_at_shutdown=True,
-                                            path='/__profile__')
+                                          cachegrind_filename='cachegrind.out',
+                                          discard_first_request=True,
+                                          flush_at_shutdown=True,
+                                           path='/__profile__')
 
     # hooking a client debugger
     if global_conf.get('client_debug', 'false').lower() == 'true':
