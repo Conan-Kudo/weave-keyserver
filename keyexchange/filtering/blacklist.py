@@ -114,16 +114,19 @@ class Blacklist(object):
             return
         self._lock.acquire()
         try:
-            data = self._cache_server.get('keyexchange:blacklist')
-            # merging the memcached values
-            if data is not None:
-                ips, ttls = data
-                # get new blacklisted IP
-                if not self.ips.issuperset(ips):
-                    self.ips.union(ips)
-                    self._ttls.update(ttls)
+            self._update()
         finally:
             self._lock.release()
+
+    def _update(self):
+        data = self._cache_server.get('keyexchange:blacklist')
+        # merging the memcached values
+        if data is not None:
+            ips, ttls = data
+            # get new blacklisted IP
+            if not self.ips.issuperset(ips):
+                self.ips.union(ips)
+                self._ttls.update(ttls)
 
     def save(self):
         """Save the IP into memcached if needed."""
@@ -132,16 +135,13 @@ class Blacklist(object):
 
         self._lock.acquire()
         try:
-            # doing a CAS to avoid race conditions
-            tries = 0
-            while tries < 10:
-                data = self.ips, self._ttls
-                #if self._cache_server.cas('keyexchange:blacklist', data):
-                if self._cache_server.set('keyexchange:blacklist', data):
-                    self._dirty = False
-                    break
-                self.update()  # reload
-                tries += 1
+            # XXX will use CAS/GETS once pylibmc 1.1.2 is released
+            self._update()
+            data = self.ips, self._ttls
+            if not self._cache_server.set('keyexchange:blacklist', data):
+                from keyexchange.filtering import logger
+                logger.error('Could not update the backlist')
+            self._dirty = False
         finally:
             self._lock.release()
 
