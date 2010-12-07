@@ -35,8 +35,36 @@
 # ***** END LICENSE BLOCK *****
 import unittest
 import time
+import threading
 
 from keyexchange.filtering.ipqueue import IPQueue
+
+
+class Worker(threading.Thread):
+    def __init__(self, queue, ips):
+        self.queue = queue
+        self.ips = ips
+        threading.Thread.__init__(self)
+
+    def run(self):
+        for i in range(100):
+            for ip in self.ips:
+                self.queue.append(ip)
+
+
+class Remover(threading.Thread):
+    def __init__(self, queue, ips):
+        self.queue = queue
+        self.ips = ips
+        threading.Thread.__init__(self)
+
+    def run(self):
+        for i in range(100):
+            for ip in self.ips:
+                try:
+                    self.queue.remove(ip)
+                except ValueError:
+                    pass
 
 
 class TestIPQueue(unittest.TestCase):
@@ -59,3 +87,17 @@ class TestIPQueue(unittest.TestCase):
         for ip in ('ip1', 'ip2'):
             queue.append(ip)
         self.assertEqual(queue.count('ip2'), 1)
+
+    def test_threading(self):
+        # make sure the queue supports concurrency
+        queue = IPQueue()
+        workers = [Worker(queue, ['1', '2', '3']) for i in range(10)]
+        removers = [Remover(queue, ['2', '3']) for i in range(10)]
+        for worker in workers + removers:
+            worker.start()
+
+        for worker in workers + removers:
+            worker.join()
+
+        # if the queue is not thread-safe we would get less than 1000 here
+        self.assertEqual(queue.count('1'), 1000)

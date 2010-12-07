@@ -34,6 +34,7 @@
 #
 # ***** END LICENSE BLOCK *****
 from collections import deque
+import threading
 import time
 
 
@@ -57,23 +58,28 @@ class IPQueue(deque):
         self._last_update = dict()
         self._maxlen = maxlen
         self._ttl = float(ttl)
+        self._lock = threading.RLock()
 
     def append(self, ip):
         """Adds the IP and raise the counter accordingly."""
-        if ip not in self._ips:
-            self._ips.appendleft(ip)
-            self._counter[ip] = 1
-        else:
-            self._ips.remove(ip)
-            self._ips.appendleft(ip)
-            self._counter[ip] += 1
+        self._lock.acquire()
+        try:
+            if ip not in self._ips:
+                self._ips.appendleft(ip)
+                self._counter[ip] = 1
+            else:
+                self._ips.remove(ip)
+                self._ips.appendleft(ip)
+                self._counter[ip] += 1
 
-        self._last_update[ip] = time.time()
+            self._last_update[ip] = time.time()
 
-        if len(self._ips) > self._maxlen:
-            ip = self._ips.pop()
-            del self._counter[ip]
-            del self._last_update[ip]
+            if len(self._ips) > self._maxlen:
+                ip = self._ips.pop()
+                del self._counter[ip]
+                del self._last_update[ip]
+        finally:
+            self._lock.release()
 
     def _discard_if_old(self, ip):
         updated = self._last_update.get(ip)
@@ -107,6 +113,10 @@ class IPQueue(deque):
         return ip in self._ips
 
     def remove(self, ip):
-        self._ips.remove(ip)
-        del self._counter[ip]
-        del self._last_update[ip]
+        self._lock.acquire()
+        try:
+            self._ips.remove(ip)
+            del self._counter[ip]
+            del self._last_update[ip]
+        finally:
+            self._lock.release()
