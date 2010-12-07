@@ -49,8 +49,11 @@ class TestIPQueue(unittest.TestCase):
             queue.append(ip)
 
         self.assertEqual(queue.count('ip2'), 2)
+        self.assertTrue('ip2' in queue)
 
-        time.sleep(0.6)
+        time.sleep(0.6)  # that kills all
+
+        self.assertEqual(len(queue), 0)
         self.assertEqual(queue.count('ip2'), 0)
 
         for ip in ('ip1', 'ip2'):

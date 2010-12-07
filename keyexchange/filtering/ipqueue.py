@@ -86,12 +86,12 @@ class IPQueue(deque):
 
     def _discard_old_ips(self):
         # from right-to-left check the age and discard old ones
-        index = -1
+        index = len(self._ips) - 1
         while index >= 0:
             ip = self._ips[index]
             if not self._discard_if_old(ip):
                 return
-            index += 1
+            index -= 1
 
     def count(self, ip):
         """Returns the IP count."""
