@@ -37,9 +37,11 @@ import unittest
 import time
 import threading
 import random
+import cPickle
 
 from keyexchange.filtering.middleware import IPFiltering
 from keyexchange.filtering.blacklist import Blacklist
+from keyexchange.filtering.ipqueue import IPQueue
 from keyexchange.util import MemoryClient
 
 from webtest import TestApp, AppError
@@ -291,3 +293,10 @@ class TestIPFiltering(unittest.TestCase):
             app._blacklisted.update = old_update
 
         self.assertEqual(counter[0], 2)
+
+    def test_pickling(self):
+        queue = IPQueue()
+        queue.append('one')
+        pickled = cPickle.dumps(queue)
+        queue2 = cPickle.loads(pickled)
+        self.assertEqual(queue2.count('one'), 1)

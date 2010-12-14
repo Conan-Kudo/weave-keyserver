@@ -33,12 +33,14 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
+import cPickle
+import copy_reg
 from collections import deque
 import threading
 import time
 
 
-class IPQueue(deque):
+class IPQueue(object):
     """IP Queue that keeps a counter for each IP.
 
     When an IP comes in, it's append in the left and the counter
@@ -59,6 +61,14 @@ class IPQueue(deque):
         self._maxlen = maxlen
         self._ttl = float(ttl)
         self._lock = threading.RLock()
+
+    def __getstate__(self):
+        odict = self.__dict__.copy()
+        del odict['_lock']
+        return odict
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
 
     def append(self, ip):
         """Adds the IP and raise the counter accordingly."""
