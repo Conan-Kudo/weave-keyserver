@@ -101,6 +101,18 @@ class Blacklist(object):
             # sys.exit() call all threads join() in >= 2.6.5
             self._syncer.start()
 
+    def __getstate__(self):
+        odict = self.__dict__.copy()
+        del odict['_lock']
+        if self.async:
+            del odict['_syncer']
+        return odict
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        if self.async:
+            self._lock = threading.RLock()
+
     def _get_dirty(self):
         # hiding it behind a property since
         # this design could change internally

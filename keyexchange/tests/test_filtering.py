@@ -300,3 +300,10 @@ class TestIPFiltering(unittest.TestCase):
         pickled = cPickle.dumps(queue)
         queue2 = cPickle.loads(pickled)
         self.assertEqual(queue2.count('one'), 1)
+
+        cache = MemoryClient(None)
+        blacklist = Blacklist(cache)
+        blacklist.add('ip')
+        pickled = cPickle.dumps(blacklist)
+        bl2 = cPickle.loads(pickled)
+        self.assertTrue('ip' in bl2)
