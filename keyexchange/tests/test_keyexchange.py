@@ -245,6 +245,7 @@ class TestWsgiApp(unittest.TestCase):
         curl = '/%s' % cid
 
         headers['X-KeyExchange-Cid'] = cid
+        headers['X-KeyExchange-Log'] = 'some log'
         self.app.post('/report', headers=headers, extra_environ=self.env)
         del headers['X-KeyExchange-Cid']
 
@@ -432,8 +433,11 @@ class TestWsgiApp(unittest.TestCase):
         finally:
             wsgiapp.log_failure = old
 
-        self.assertEqual(logs[0].strip(), 'somelog')
+        self.assertEqual(logs[0], 'somelog')
         self.assertEqual(logs[1], 'some\nmore')
+
+        # forbid empty reports
+        self.app.post('/report', status=400, extra_environ=self.env)
 
     def test_root(self):
         # the root must redirect to https://services.mozilla.com/

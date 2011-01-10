@@ -305,8 +305,20 @@ class KeyExchangeApp(object):
     def report(self, request, client_id):
         """Reports a log and delete the channel if relevant"""
         # logging the report
-        log = request.headers.get('X-KeyExchange-Log', '')
-        log += '\n%s' % request.body[:2000]
+        log = []
+        header_log = request.headers.get('X-KeyExchange-Log')
+        if header_log is not None:
+            log.append(header_log)
+
+        body_log = request.body[:2000].strip()
+        if body_log != '':
+            log.append(body_log)
+
+        if len(log) == 0:
+            # log is empty
+            raise HTTPBadRequest()
+
+        log = '\n'.join(log)
         log_failure(log, 5, request.environ, self.config, signature=_REPORT)
 
         # removing the channel if present
