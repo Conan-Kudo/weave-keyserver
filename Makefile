@@ -1,4 +1,5 @@
 VIRTUALENV = virtualenv
+SERVER_KEY_EXCHANGE = tip
 NOSE = bin/nosetests -s --with-xunit
 TESTS = keyexchange/tests
 PYTHON = bin/python
@@ -14,6 +15,7 @@ PYPI2RPM = bin/pypi2rpm.py
 all:	build
 
 build:
+	hg up $(SERVER_KEY_EXCHANGE)
 	$(VIRTUALENV) --no-site-packages --distribute .
 	$(PYTHON) build.py
 	$(PYTHON) setup.py develop
