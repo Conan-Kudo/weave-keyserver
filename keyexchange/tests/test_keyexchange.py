@@ -482,3 +482,12 @@ class TestWsgiApp(unittest.TestCase):
         # the channel should be gone now
         self.app.get(curl, status=404, extra_environ=self.env,
                      headers=headers)
+
+    def test_new_channel_header(self):
+        headers = {'X-KeyExchange-Id': 'b' * 256}
+        res = self.app.get('/new_channel', status=200,
+                           headers=headers, extra_environ=self.env)
+        cid = str(json.loads(res.body))
+
+        # checking that the header is also present
+        self.assertEqual(res.headers['X-KeyExchange-Channel'], cid)

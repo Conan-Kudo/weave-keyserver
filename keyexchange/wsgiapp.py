@@ -158,8 +158,11 @@ class KeyExchangeApp(object):
                                 signature=_INVALID_UID)
                 finally:
                     raise HTTPBadRequest()
+            cid = self._get_new_cid(client_id)
+            headers = [('X-KeyExchange-Channel', cid),
+                       ('Content-Type', 'application/json')]
+            return json_response(cid, headerlist=headers)
 
-            return json_response(self._get_new_cid(client_id))
         elif url == 'report':
             if method != 'POST':
                 raise HTTPMethodNotAllowed()
