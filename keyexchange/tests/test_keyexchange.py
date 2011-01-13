@@ -52,6 +52,7 @@ from keyexchange.util import MemoryClient
 
 HERE = os.path.dirname(__file__)
 
+
 class User(threading.Thread):
 
     def __init__(self, name, passwd, app, data=None, cid=None):
@@ -68,7 +69,7 @@ class User(threading.Thread):
 
         self.id = hash * 4
         if data is not None:
-            res = self.app.get(self.root+'/new_channel',
+            res = self.app.get(self.root + '/new_channel',
                                headers={'X-KeyExchange-Id': self.id},
                                extra_environ=self.app.env)
             self.cid = str(json.loads(res.body))
@@ -87,13 +88,14 @@ class User(threading.Thread):
                                         'X-KeyExchange-Id': self.id})
 
             status = res.status_int
-            attempts +=1
+            attempts += 1
             if status == 304:
                 time.sleep(.2)
 
         if status == 304:
             raise AssertionError('Failed to get next step')
         body = json.loads(res.body)
+
         def _clean(body):
             if isinstance(body, unicode):
                 return str(body)
@@ -278,7 +280,6 @@ class TestWsgiApp(unittest.TestCase):
         self.app.put(curl,  params='somedata', status=404, headers=headers,
                      extra_environ=self.env)
 
-
     def test_id_header(self):
         # all calls must be made with a unique 'X-KeyExchange-Id' header
         # this id must be of length 256
@@ -460,7 +461,6 @@ class TestWsgiApp(unittest.TestCase):
         # getting the etag
         res = self.app.put(curl, headers=headers, extra_environ=self.env,
                            params='xxx')
-        etag = res.headers['ETag']
         headers2 = dict(headers)
         headers2['If-None-Match'] = res.headers['ETag']
         # this should not increment the counter (poll)
@@ -482,6 +482,63 @@ class TestWsgiApp(unittest.TestCase):
         # the channel should be gone now
         self.app.get(curl, status=404, extra_environ=self.env,
                      headers=headers)
+
+    def test_if_modified(self):
+        # creating a new channel
+        headers = {'X-KeyExchange-Id': 'b' * 256}
+        res = self.app.get('/new_channel', status=200,
+                           headers=headers, extra_environ=self.env)
+        cid = str(json.loads(res.body))
+        curl = '/%s' % cid
+
+        # client A puts some data
+        self.app.put(curl, headers=headers, extra_environ=self.env,
+                     params='ooo')
+
+        # client B gets it
+        res = self.app.get(curl, headers=headers, extra_environ=self.env)
+
+        # client B also keeps the etag from that data
+        etag = res.headers['ETag']
+
+        # client B put some data
+        self.app.put(curl, headers=headers, extra_environ=self.env,
+                     params='xxx')
+
+        # too bad...  client B had a timeout here !
+
+        # and in the meantime client A did put some data
+        self.app.put(curl, headers=headers, extra_environ=self.env,
+                     params='otherdata')
+
+        # Client B retry with an If-Match header, with the etag
+        # of the latest data he did GET from A
+        headers['If-Match'] = etag
+
+        # Client B gets a 412: it means, that the channel
+        # has a different content than the last GET B received
+        res = self.app.put(curl, headers=headers, extra_environ=self.env,
+                           status=412)
+
+        # Client B reads the ETag it got back
+        current_etag = res.headers['ETag']
+
+        # so, IOW Client B latest PUT was successful.
+        # let's GET again
+        res = self.app.get(curl, headers=headers, extra_environ=self.env)
+
+        # client B keeps the etag from that data
+        etag = res.headers['ETag']
+
+        # client B puts some data that never make it to
+        # the server
+
+        # client B try again with the If-Match
+        headers['If-Match'] = etag
+        self.app.put(curl, headers=headers, extra_environ=self.env,
+                     status=200)
+
+        # success !
 
     def test_new_channel_header(self):
         headers = {'X-KeyExchange-Id': 'b' * 256}

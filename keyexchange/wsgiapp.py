@@ -45,7 +45,7 @@ import random
 from webob.dec import wsgify
 from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
                        HTTPBadRequest, HTTPMethodNotAllowed,
-                       HTTPMovedPermanently)
+                       HTTPMovedPermanently, HTTPPreconditionFailed)
 
 from services.cef import log_failure
 from services.util import convert_config, filter_params
@@ -248,9 +248,24 @@ class KeyExchangeApp(object):
             dt = datetime.datetime.now()
         return md5('%s:%s' % (len(data), dt.isoformat())).hexdigest()
 
+    def _etag_match(self, etag, header):
+        if not hasattr(header, 'etags'):
+            return False
+        return etag in getattr(header, 'etags')
+
     def put_channel(self, request, channel_id, existing_content):
         """Append data into channel."""
         ttl, ids, old_data, old_etag = existing_content
+
+        # check the If-Match header
+        if request.if_match is not None:
+            if str(request.if_match) != '*':
+
+                # if If-Match is provided, it must be the value of
+                # the etag before the update is applied
+                if not self._etag_match(old_etag, request.if_match):
+                    raise HTTPPreconditionFailed(etag=old_etag)
+
         data = request.body
         etag = self._etag(data)
         if not self.cache.set(channel_id, (ttl, ids, request.body, etag),
@@ -265,8 +280,7 @@ class KeyExchangeApp(object):
 
         # check the If-None-Match header
         if request.if_none_match is not None:
-            if (hasattr(request.if_none_match, 'etags') and
-                etag in request.if_none_match.etags):
+            if self._etag_match(etag, request.if_none_match):
                 raise HTTPNotModified()
 
         # keep the GET counter up-to-date
