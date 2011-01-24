@@ -371,14 +371,14 @@ class TestWsgiApp(unittest.TestCase):
                      extra_environ=self.env)
 
         # let's report a log message (and ask for deletion)
-        old = wsgiapp.log_failure
-        wsgiapp.log_failure = _counter
+        old = wsgiapp.log_cef
+        wsgiapp.log_cef = _counter
         try:
             headers['X-KeyExchange-Log'] = 'my log'
             headers['X-KeyExchange-Cid'] = cid
             self.app.post('/report', headers=headers, extra_environ=self.env)
         finally:
-            wsgiapp.log_failure = old
+            wsgiapp.log_cef = old
 
         self.assertEqual(logs[0].strip(), 'my log')
 
@@ -425,14 +425,14 @@ class TestWsgiApp(unittest.TestCase):
             logs.append(log)
 
         headers = {'X-KeyExchange-Log': 'some'}
-        old = wsgiapp.log_failure
-        wsgiapp.log_failure = _counter
+        old = wsgiapp.log_cef
+        wsgiapp.log_cef = _counter
         try:
             self.app.post('/report', params='somelog', extra_environ=self.env)
             self.app.post('/report', params='more', extra_environ=self.env,
                           headers=headers)
         finally:
-            wsgiapp.log_failure = old
+            wsgiapp.log_cef = old
 
         self.assertEqual(logs[0], 'somelog')
         self.assertEqual(logs[1], 'some\nmore')
