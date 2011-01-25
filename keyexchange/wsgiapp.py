@@ -64,6 +64,7 @@ _INVALID_UID = 'InvalidClientId'
 _UNKNOWN_UID = 'UnknownClientId'
 _BLACKLISTED = 'BlacklistedIP'
 _REPORT = 'Report'
+_EMPTY = '{}'
 
 
 def _cid2str(cid):
@@ -92,7 +93,7 @@ class KeyExchangeApp(object):
     def _get_new_cid(self, client_id):
         tries = 0
         ttl = time.time() + self.ttl
-        content = ttl, [client_id], '{}', None
+        content = ttl, [client_id], _EMPTY, None
 
         while tries < 100:
             new_cid = generate_cid(self.cid_len)
@@ -243,10 +244,8 @@ class KeyExchangeApp(object):
 
         return content
 
-    def _etag(self, data, dt=None):
-        if dt is None:
-            dt = datetime.datetime.now()
-        return md5('%s:%s' % (len(data), dt.isoformat())).hexdigest()
+    def _etag(self, data):
+        return md5(data).hexdigest()
 
     def _etag_match(self, etag, header):
         if not hasattr(header, 'etags'):
@@ -257,17 +256,23 @@ class KeyExchangeApp(object):
         """Append data into channel."""
         ttl, ids, old_data, old_etag = existing_content
 
-        # check the If-Match header
-        if request.if_match is not None:
-            if str(request.if_match) != '*':
+        data = request.body
+        etag = self._etag(data)
 
+        # check the If-Match header
+        if 'If-Match' in request.headers:
+            if str(request.if_match) != '*':
                 # if If-Match is provided, it must be the value of
                 # the etag before the update is applied
                 if not self._etag_match(old_etag, request.if_match):
-                    raise HTTPPreconditionFailed(etag=old_etag)
+                    raise HTTPPreconditionFailed(etag=etag)
+        elif 'If-None-Match' in request.headers:
+            if str(request.if_none_match) == '*':
+                # we will put data in the channel only if it's
+                # empty (== first PUT)
+                if old_data != _EMPTY:
+                    raise HTTPPreconditionFailed(etag=etag)
 
-        data = request.body
-        etag = self._etag(data)
         if not self.cache.set(channel_id, (ttl, ids, request.body, etag),
                               time=ttl):
             raise HTTPServiceUnavailable()

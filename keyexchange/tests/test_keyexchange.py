@@ -483,7 +483,7 @@ class TestWsgiApp(unittest.TestCase):
         self.app.get(curl, status=404, extra_environ=self.env,
                      headers=headers)
 
-    def test_if_modified(self):
+    def test_if_modified2(self):
         # creating a new channel
         headers = {'X-KeyExchange-Id': 'b' * 256}
         res = self.app.get('/new_channel', status=200,
@@ -494,6 +494,32 @@ class TestWsgiApp(unittest.TestCase):
         # client A puts some data
         self.app.put(curl, headers=headers, extra_environ=self.env,
                      params='ooo')
+
+        # ..ooops... client A had a timeout but the server received
+
+        # client A tries again with a If-Match-None: *
+        headers['If-None-Match'] = '*'
+        self.app.put(curl, headers=headers, extra_environ=self.env,
+                     params='ooo', status=412)
+
+    def test_if_modified(self):
+        # creating a new channel
+        headers = {'X-KeyExchange-Id': 'b' * 256}
+        res = self.app.get('/new_channel', status=200,
+                           headers=headers, extra_environ=self.env)
+        cid = str(json.loads(res.body))
+        curl = '/%s' % cid
+
+        # client A puts some data
+        # ..ooops... client A had a timeout and the server did not receive it
+
+
+        # client A tries again with a If-Match-None: *
+        headers['If-None-Match'] = '*'
+        self.app.put(curl, headers=headers, extra_environ=self.env,
+                     params='ooo')
+        del headers['If-None-Match']
+
 
         # client B gets it
         res = self.app.get(curl, headers=headers, extra_environ=self.env)

@@ -25,6 +25,8 @@ build:
 	$(EZ) pylint
 	$(EZ) coverage
 	$(EZ) pypi2rpm
+	$(EZ) wsgi_intercept
+
 
 test:
 	$(NOSE) $(TESTS)
