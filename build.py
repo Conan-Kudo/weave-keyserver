@@ -47,7 +47,7 @@ def build_deps():
         deps = os.path.abspath(os.path.join(CURDIR, 'deps'))
         if not os.path.exists(deps):
             os.mkdir(deps)
-        for dep in ('server-core', 'server-reg', 'server-storage'):
+        for dep in ('server-core',):
             # looking for an environ with a specific tag or rev
             rev = os.environ.get(dep.upper().replace('-', '_'))
             if rev is not None:
