@@ -23,10 +23,6 @@ Now you can create all RPM for the project and its dependencies::
 
     $ make build_rpms
 
-If you need a RPM for SyncCore, you can create one from the subrepos located in deps/::
-
-    $ make build_core
-
 Once this is over, you will find all RPMs in rpms/
 
 Then you can install python26-keyexchange with Yum will install all

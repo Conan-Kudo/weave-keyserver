@@ -10,7 +10,7 @@ PYLINT = bin/pylint
 PKGS = keyexchange
 PYPI2RPM = bin/pypi2rpm.py
 
-.PHONY: all build test bench_one bench bend_report build_rpms hudson lint build_core
+.PHONY: all build test bench_one bench bend_report build_rpms hudson lint
 
 all:	build
 
@@ -72,9 +72,6 @@ build_rpms:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms beaker --version=1.5.4
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms python-memcached --version=1.45
 	rm -rf build; $(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=KeyExchange.spec --dist-dir=$(CURDIR)/rpms --binary-only
-
-build_core:
-	mkdir $(CURDIR)/rpms -p
 	cd deps/server-core; rm -rf build; ../../$(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=Services.spec --dist-dir=$(CURDIR)/rpms --binary-only
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms simplejson --version=2.1.1
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms routes --version=1.12.3
