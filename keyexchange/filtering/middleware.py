@@ -138,12 +138,21 @@ class IPFiltering(object):
     def _check_ip(self, ip, environ):
         if self._is_whitelisted(ip):
             return
+
+        # in observe mode we want to check if the ip is not
+        # already blacklisted before we treat it
+        # If it's blacklisted, we don't even want to add it
+        # in the queue.
+        if self.observe and ip in self._blacklisted:
+            return
+
         # insert the IP in the queue
         # if the queue is full, the opposite-end item is discarded
         self._last_ips.append(ip)
 
         # counts its ratio in the queue
         if self._last_ips.count(ip) >= self.treshold:
+
             # blacklisting the IP
             self._blacklisted.add(ip, self.blacklist_ttl)
             if self.callback is not None:

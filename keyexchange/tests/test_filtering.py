@@ -307,3 +307,29 @@ class TestIPFiltering(unittest.TestCase):
         pickled = cPickle.dumps(blacklist)
         bl2 = cPickle.loads(pickled)
         self.assertTrue('ip' in bl2)
+
+    def test_observe_blacklist(self):
+        self.app.app.observe = True
+        env = {'REMOTE_ADDR': 'ok'}
+
+        # keeping track of the calls
+        count = [0]
+
+        def _inc(*args):
+            count[0] += 1
+
+        self.app.app.callback = _inc
+
+        # doing 5 calls
+        for i in range(5):
+            self.app.get('/', status=200, extra_environ=env)
+
+        self.assertEqual(count[0], 1)
+
+        # we should be blacklisted now, but should still work
+        for i in range(5):
+            self.app.get('/', status=200, extra_environ=env)
+
+        # but we don't want to callback in case the ip is
+        # blacklisted in observe mode
+        self.assertEqual(count[0], 1)
