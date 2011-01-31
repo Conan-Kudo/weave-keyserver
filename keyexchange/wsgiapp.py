@@ -341,7 +341,8 @@ class KeyExchangeApp(object):
             raise HTTPBadRequest()
 
         log = '\n'.join(log)
-        log_cef(log, 5, request.environ, self.config, signature=_REPORT)
+        log_cef('Report', 5, request.environ, self.config, signature=_REPORT,
+                msg=log)
 
         # removing the channel if present
         channel_id = request.headers.get('X-KeyExchange-Cid')

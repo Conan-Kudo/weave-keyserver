@@ -66,7 +66,8 @@ class IPFiltering(object):
                  br_treshold=5, cache_servers=['127.0.0.0.1:11211'],
                  admin_page=None, use_memory=False, refresh_frequency=1,
                  observe=False, callback=None, ip_whitelist=None,
-                 async=True, update_blfreq=None, ip_queue_ttl=360):
+                 async=True, update_blfreq=None, ip_queue_ttl=360,
+                 br_callback=None):
 
         """Initializes the middleware.
 
@@ -86,6 +87,8 @@ class IPFiltering(object):
           queue.
         - callback: callable that will be called with an IP that is added
           in the blacklist.
+        - br_callback: callable that will be called when a bad request is
+          caught.
         - ip_whitelist: a list of IP that should never be blacklisted.
           Supports all netmask notations.
         - async: if True, uses a thread to sync the blacklist. Otherwise
@@ -120,6 +123,8 @@ class IPFiltering(object):
         admin_mako = os.path.join(os.path.dirname(__file__), 'admin.mako')
         self._admin_tpl = Template(filename=admin_mako)
         self.callback = callback
+        self.br_callback = br_callback
+
         if ip_whitelist is None:
             self.ip_whitelist = []
         else:
@@ -160,6 +165,12 @@ class IPFiltering(object):
 
     def _inc_bad_request(self, ip, environ):
         if self._is_whitelisted(ip):
+            return
+
+        if self.br_callback is not None:
+                self.br_callback(ip, environ)
+
+        if self.observe and ip in self._blacklisted:
             return
         # insert the IP in the br queue
         # if the queue is full, the opposite-end item is discarded

@@ -42,6 +42,7 @@ import time
 import random
 import hashlib
 import os
+import tempfile
 
 from webtest import TestApp, AppError
 from paste.deploy import loadapp
@@ -190,6 +191,17 @@ class TestWsgiApp(unittest.TestCase):
         app.max_bad_request_calls = 100000
         self.app = TestApp(app)
         self.app.env = self.env = {'REMOTE_ADDR': '127.0.0.1'}
+        self._files = []
+
+    def tearDown(self):
+        for file_ in self._files:
+            if os.path.exists(file_):
+                os.remove(file_)
+
+    def _tmpfile(self):
+        fd, name = tempfile.mkstemp()
+        self._files.append(name)
+        return name
 
     def test_session(self):
         # we want to send data in a secure channel
@@ -364,7 +376,7 @@ class TestWsgiApp(unittest.TestCase):
         logs = []
 
         def _counter(log, *args, **kw):
-            logs.append(log)
+            logs.append(kw['msg'])
 
         # the channel is present
         self.app.get(curl, status=200, headers=headers,
@@ -422,7 +434,7 @@ class TestWsgiApp(unittest.TestCase):
         logs = []
 
         def _counter(log, *args, **kw):
-            logs.append(log)
+            logs.append(kw['msg'])
 
         headers = {'X-KeyExchange-Log': 'some'}
         old = wsgiapp.log_cef
@@ -574,3 +586,56 @@ class TestWsgiApp(unittest.TestCase):
 
         # checking that the header is also present
         self.assertEqual(res.headers['X-KeyExchange-Channel'], cid)
+
+    def test_new_channel_observe_mode_cef(self):
+
+        logfile = self._tmpfile()
+
+        # we want to work in observe mode
+        config = {'keyexchange.use_memory': True,
+                  'filtering.use': True,
+                  'filtering.treshold': 1,
+                  'filtering.use_memory': True,
+                  'filtering.observe': True,
+                  'cef.use': True,
+                  'cef.file': logfile,
+                  'cef.version': '1',
+                  'cef.vendor': 'moz',
+                  'cef.device_version': '1',
+                  'cef.product': 'keyex'}
+
+        app = wsgiapp.make_app(config)
+        test_app = TestApp(app)
+        test_app.env = self.env = {'REMOTE_ADDR': '127.0.0.1'}
+
+        key = ("0987507938961303790993045438290584563289655491418028073179828"
+               "34980265161474647d3361865e53d1d7c5a1fa70481fe988c34a29e4acfaf"
+               "b16362dc0b73905a207bfed485d6e52ebefd14c26cb79247f24e5dfaf931e"
+               "574c39acdecba375e81a560b00a311765cc02b5a4d01804955e7256317418"
+               "af1cc1fb84ae123123")
+
+        headers = {'X-KeyExchange-Id': key}
+
+        # let's do one call (id too long)
+        test_app.get('/new_channel', status=400,
+                     headers=headers, extra_environ=self.env)
+
+        # we should be blacklisted now. but in observe mode,
+        # life continues
+        for i in range(10):
+            test_app.get('/new_channel', status=400,
+                         headers=headers, extra_environ=self.env)
+
+        headers = {'X-KeyExchange-Id': 'x' * 256}
+        test_app.get('/new_channel', status=200,
+                     headers=headers, extra_environ=self.env)
+
+        # now let's check the CEF logs, we should have only
+        # one 'blacklisted' event, followed by 11 bad requests events.
+        with open(logfile) as f:
+            logs = [line.split('|')[4]
+                    for line in f.read().split('\n')
+                    if line.strip() != '']
+
+        self.assertEqual(logs.count('BlacklistedIP'), 1)
+        self.assertEqual(logs.count('InvalidClientId'), 11)
