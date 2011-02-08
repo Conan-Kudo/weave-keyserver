@@ -67,7 +67,7 @@ class User(threading.Thread):
         self.id = hash * 4
         if data is not None:
             self.app.setHeader('X-KeyExchange-Id', self.id)
-            res = self.app.get(self.root+'/new_channel')
+            res = self.app.get(self.root + '/new_channel')
                                #extra_environ=self.app.env)
             self.cid = str(json.loads(res.body))
         else:
@@ -83,13 +83,14 @@ class User(threading.Thread):
             try:
                 res = self.app.get(self.curl)
                 status = 200
-            except AssertionError, e:
-                attempts +=1
+            except AssertionError:
+                attempts += 1
             time.sleep(.2)
 
         if status == 304:
             raise AssertionError('Failed to get next step')
         body = json.loads(res.body)
+
         def _clean(body):
             if isinstance(body, unicode):
                 return str(body)

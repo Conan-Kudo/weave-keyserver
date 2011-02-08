@@ -4,6 +4,15 @@ from socket import error as SocketError
 
 from funkload import FunkLoadTestCase
 from webunit import cookie
+from urllib import urlencode
+import httplib
+import urlparse
+import os
+from funkload.utils import Data
+import cStringIO
+from webunit.webunittest import HTTPResponse, HTTPError, VERBOSE
+from webunit.utility import Upload, mimeEncode, BOUNDARY
+
 
 FunkLoadTestCase._Old = FunkLoadTestCase.FunkLoadTestCase
 
@@ -28,7 +37,8 @@ class _FunkLoadTestCase(FunkLoadTestCase._Old):
     def delete(self, url, params=None, description=None, ok_codes=None):
         self.steps += 1
         self.page_responses = 0
-        return self._browse(url, params, description, ok_codes, method='DELETE')
+        return self._browse(url, params, description, ok_codes,
+                            method='DELETE')
 
     def _connect(self, url, params, ok_codes, rtype, description):
         """Handle fetching, logging, errors and history."""
@@ -58,7 +68,8 @@ class _FunkLoadTestCase(FunkLoadTestCase._Old):
                     self._dump_content(value.response)
 
                 body = value.response.body
-                raise self.failureException, str(value.response) + ' ' + str(body)
+                raise self.failureException, (str(value.response) + ' ' +
+                                              str(body))
             else:
                 self._log_response_error(url, rtype, description, t_start,
                                          t_stop)
@@ -88,12 +99,6 @@ class _FunkLoadTestCase(FunkLoadTestCase._Old):
 
 FunkLoadTestCase.FunkLoadTestCase = _FunkLoadTestCase
 
-import httplib
-import urlparse
-import os
-from funkload.utils import Data
-import cStringIO
-from webunit.webunittest import HTTPResponse, HTTPError, VERBOSE
 
 def WF_fetch(self, url, postdata=None, server=None, port=None, protocol=None,
              ok_codes=None, key_file=None, cert_file=None, method=None):
@@ -175,7 +180,7 @@ def WF_fetch(self, url, postdata=None, server=None, port=None, protocol=None,
         else:
             host_header = '%s:%s' % (server, port)
     else:
-        raise ValueError, protocol
+        raise ValueError(protocol)
 
     headers = []
     params = None
@@ -202,11 +207,13 @@ def WF_fetch(self, url, postdata=None, server=None, port=None, protocol=None,
                         break
                 if is_multipart:
                     params = mimeEncode(postdata)
-                    headers.append(('Content-type', 'multipart/form-data; boundary=%s'%
+                    headers.append(('Content-type',
+                                    'multipart/form-data; boundary=%s' % \
                                     BOUNDARY))
                 else:
                     params = urlencode(postdata)
-                    headers.append(('Content-type', 'application/x-www-form-urlencoded'))
+                    headers.append(('Content-type',
+                                    'application/x-www-form-urlencoded'))
             headers.append(('Content-length', str(len(params))))
     else:
         if method is None:
@@ -219,7 +226,7 @@ def WF_fetch(self, url, postdata=None, server=None, port=None, protocol=None,
 
     # Other Full Request headers
     if self.authinfo:
-        headers.append(('Authorization', "Basic %s"%self.authinfo))
+        headers.append(('Authorization', "Basic %s" % self.authinfo))
     if not webproxy:
         # HTTPConnection seems to add a host header itself.
         # So we only need to do this if we are not using a proxy.
@@ -255,7 +262,7 @@ def WF_fetch(self, url, postdata=None, server=None, port=None, protocol=None,
                 # around expires
                 if sendcookie.coded_value in ('"deleted"', "null"):
                     continue
-                cookie_list.append("%s=%s;"%(sendcookie.key,
+                cookie_list.append("%s=%s;" % (sendcookie.key,
                                             sendcookie.coded_value))
                 cookies_used.append(sendcookie.key)
 
@@ -265,9 +272,8 @@ def WF_fetch(self, url, postdata=None, server=None, port=None, protocol=None,
     # check that we sent the cookies we expected to
     if self.expect_cookies is not None:
         assert cookies_used == self.expect_cookies, \
-            "Didn't use all cookies (%s expected, %s used)"%(
+            "Didn't use all cookies (%s expected, %s used)" % (
             self.expect_cookies, cookies_used)
-
 
     # write and finish the headers
     for header in headers:
@@ -331,7 +337,7 @@ def WF_fetch(self, url, postdata=None, server=None, port=None, protocol=None,
                 msg = "Matched error: %s" % content
                 if hasattr(self, 'results') and self.results:
                     self.writeError(url, msg)
-                self.log('Matched error'+`(url, content)`, data)
+                self.log('Matched error %r %r' % (url, content), data)
                 if VERBOSE:
                     sys.stdout.write('c')
                     sys.stdout.flush()
@@ -346,5 +352,3 @@ from funkload import PatchWebunit
 from webunit.webunittest import WebFetcher
 
 WebFetcher.fetch = PatchWebunit.WF_fetch = WF_fetch
-
-

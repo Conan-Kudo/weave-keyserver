@@ -33,8 +33,6 @@
 # the terms of any one of the MPL, the GPL or the LGPL.
 #
 # ***** END LICENSE BLOCK *****
-import cPickle
-import copy_reg
 from collections import deque
 import threading
 import time

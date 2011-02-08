@@ -524,14 +524,11 @@ class TestWsgiApp(unittest.TestCase):
 
         # client A puts some data
         # ..ooops... client A had a timeout and the server did not receive it
-
-
         # client A tries again with a If-Match-None: *
         headers['If-None-Match'] = '*'
         self.app.put(curl, headers=headers, extra_environ=self.env,
                      params='ooo')
         del headers['If-None-Match']
-
 
         # client B gets it
         res = self.app.get(curl, headers=headers, extra_environ=self.env)
@@ -559,7 +556,7 @@ class TestWsgiApp(unittest.TestCase):
                            status=412)
 
         # Client B reads the ETag it got back
-        current_etag = res.headers['ETag']
+        #current_etag = res.headers['ETag']
 
         # so, IOW Client B latest PUT was successful.
         # let's GET again
@@ -637,5 +634,5 @@ class TestWsgiApp(unittest.TestCase):
                     for line in f.read().split('\n')
                     if line.strip() != '']
 
-        self.assertEqual(logs.count('BlacklistedIP'), 1)
-        self.assertEqual(logs.count('InvalidClientId'), 11)
+        self.assertEqual(logs.count('BlackListed IP'), 1)
+        self.assertEqual(logs.count('Invalid X-KeyExchange-Id'), 11)

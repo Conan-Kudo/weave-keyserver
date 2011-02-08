@@ -1,3 +1,5 @@
+
+# -*- flake8: NOQA -*-
 """
 IPy - class and tools for handling of IPv4 and IPv6 addresses and networks.
 See README file for learn how to use IPy.
@@ -5,7 +7,6 @@ See README file for learn how to use IPy.
 Further Information might be available at:
 http://software.inl.fr/trac/trac.cgi/wiki/IPy
 """
-
 # $HeadURL: https://svn.inl.fr/inl-svn/src/tools/ipy/tags/IPy-0.71/IPy.py $
 # $Id: IPy.py 20262 2010-10-01 10:41:10Z haypo $
 
