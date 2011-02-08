@@ -121,7 +121,6 @@ class TestIPFiltering(unittest.TestCase):
         time.sleep(1.5)
         self.app.get('/', status=200, extra_environ=env)
 
-
     def test_reached_br_max(self):
         self.app.app.br_treshold = 3
         env = {'HTTP_X_FORWARDED_FOR': '167.0.0.1, 10.1.1.2, 10.12.12.1'}
@@ -260,8 +259,10 @@ class TestIPFiltering(unittest.TestCase):
         # testing the thread-safeness of Blacklist
         cache = MemoryClient(None)
         blacklist = Blacklist(cache)
+
         def raiseit():
             raise ValueError()
+
         blacklist.save = blacklist.update = raiseit
         # make sure the logging happens and the thread does not die
         time.sleep(0.5)
@@ -275,6 +276,7 @@ class TestIPFiltering(unittest.TestCase):
 
         # make sure the bl is getting updated on synchronous mode
         counter = [0]
+
         def _incr():
             counter[0] += 1
 

@@ -1,4 +1,4 @@
-# -*- flake8: NOQA -*-
+# flake8: noqa
 import os, binascii
 from hashlib import sha256, sha1
 try:
