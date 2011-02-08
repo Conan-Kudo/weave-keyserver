@@ -56,7 +56,7 @@ setup(name='KeyExchange', author='Tarek Ziade',
       description='J-Pake server',
       long_description=open('README.txt').read(),
       author_email='tarek@mozilla.com',
-      version=0.1, packages=find_packages(),
+      version=0.2, packages=find_packages(),
       include_package_data=True,
       entry_points=entry_points, install_requires=requires,
       license='MPL', cmdclass={'bdist_rpm': _bdist_rpm})
