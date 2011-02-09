@@ -1,3 +1,4 @@
+include RELEASE.txt
 include README.txt
 recursive-include etc *
 include setup.cfg
