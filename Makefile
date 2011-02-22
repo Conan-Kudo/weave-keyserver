@@ -11,7 +11,7 @@ PYLINT = bin/pylint
 PKGS = keyexchange
 PYPI2RPM = bin/pypi2rpm.py
 
-.PHONY: all build test bench_one bench bend_report build_rpms hudson lint
+.PHONY: all build test bench_one bench bend_report build_rpms hudson lint functest
 
 all:	build
 
@@ -25,7 +25,7 @@ build:
 	$(EZ) coverage
 	$(EZ) pypi2rpm
 	$(EZ) wsgi_intercept
-
+	$(EZ) wsgiproxy
 
 test:
 	$(NOSE) $(TESTS)

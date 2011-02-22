@@ -51,6 +51,7 @@ from keyexchange import wsgiapp
 from keyexchange.tests.client import JPAKE
 from keyexchange.util import MemoryClient
 
+
 HERE = os.path.dirname(__file__)
 
 
@@ -189,9 +190,14 @@ class TestWsgiApp(unittest.TestCase):
         app = loadapp('config:%s' % ini_file)
         # we don't test this here
         app.max_bad_request_calls = 100000
-        self.app = TestApp(app)
+
+        from services.tests.support import create_test_app
+        self.app = create_test_app(app)
+        self.filtering_middleware = self.app.app
+        self.real_app = self.filtering_middleware.app
         self.app.env = self.env = {'REMOTE_ADDR': '127.0.0.1'}
         self._files = []
+        self.distant = os.environ.get('TEST_REMOTE') is not None
 
     def tearDown(self):
         for file_ in self._files:
@@ -237,12 +243,6 @@ class TestWsgiApp(unittest.TestCase):
         received_data.sort()
         self.assertEqual(original_data, received_data)
 
-    def _get_app(self):
-        app = self
-        while hasattr(app, 'app'):
-            app = app.app
-        return app
-
     def test_behavior(self):
         headers = {'X-KeyExchange-Id': 'b' * 256}
 
@@ -268,8 +268,11 @@ class TestWsgiApp(unittest.TestCase):
         self.app.get(curl, status=404, headers=headers,
                      extra_environ=self.env)
 
+        if self.distant:
+            return
+
         # let's try a really small ttl to make sure it works
-        app = self._get_app()
+        app = self.real_app
 
         if isinstance(app.cache, dict):
             # memory fallback, bye-bye
@@ -392,14 +395,18 @@ class TestWsgiApp(unittest.TestCase):
         finally:
             wsgiapp.log_cef = old
 
-        self.assertEqual(logs[0].strip(), 'my log')
+        if not self.distant:
+            self.assertEqual(logs[0].strip(), 'my log')
 
         # the channel should be gone
         self.app.get(curl, status=404, headers=headers,
                      extra_environ=self.env)
 
         # let's see if the real callback is correctly called
-        self.app.app.br_treshold = 2
+        if self.distant:
+            return
+
+        self.filtering_middleware.br_treshold = 2
         for i in range(2):
             try:
                 self.app.get('/new_channel', extra_environ=self.env)
@@ -446,6 +453,9 @@ class TestWsgiApp(unittest.TestCase):
         finally:
             wsgiapp.log_cef = old
 
+        if self.distant:
+            return
+
         self.assertEqual(logs[0], 'somelog')
         self.assertEqual(logs[1], 'some\nmore')
 
@@ -460,7 +470,10 @@ class TestWsgiApp(unittest.TestCase):
         # the root also performs a health check on memcached.
         # if memcached fails to get/set/delete a test key,
         # a 503 is returned
-        self.app.app.app.cache.add = lambda x, y: False
+        if self.distant:
+            return
+
+        self.real_app.cache.add = lambda x, y: False
         res = self.app.get('/', status=503, extra_environ=self.env)
 
     def test_max_gets(self):
@@ -481,14 +494,15 @@ class TestWsgiApp(unittest.TestCase):
             self.app.get(curl, status=304, extra_environ=self.env,
                          headers=headers2)
 
-        cache = self.app.app.app.cache
+        if not self.distant:
+            cache = self.real_app.cache
 
         # 6 gets max !
         for i in range(6):
             self.app.get(curl, status=200, extra_environ=self.env,
                          headers=headers)
 
-            if i < 5:
+            if i < 5 and not self.distant:
                 self.assertEqual(cache.get('GET:%s' % cid), str(i + 1))
 
         # the channel should be gone now
