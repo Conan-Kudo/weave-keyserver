@@ -193,11 +193,16 @@ class TestWsgiApp(unittest.TestCase):
 
         from services.tests.support import create_test_app
         self.app = create_test_app(app)
-        self.filtering_middleware = self.app.app
-        self.real_app = self.filtering_middleware.app
+        self.distant = os.environ.get('TEST_REMOTE') is not None
+
+        if self.distant:
+            self.filtering_middleware = None
+            self.real_app = None
+        else:
+            self.filtering_middleware = self.app.app
+            self.real_app = self.filtering_middleware.app
         self.app.env = self.env = {'REMOTE_ADDR': '127.0.0.1'}
         self._files = []
-        self.distant = os.environ.get('TEST_REMOTE') is not None
 
     def tearDown(self):
         for file_ in self._files:
