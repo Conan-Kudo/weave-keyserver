@@ -45,7 +45,8 @@ main = paste.script.appinstall:Installer
 """
 
 requires = ['WebOb==1.0', 'Paste==1.7.5.1', 'PasteScript==1.7.3',
-            'Services==0.2', 'Mako==0.3.4']
+            'Services==0.2', 'Mako==0.3.4', 'cef']
+
 
 class _bdist_rpm(bdist_rpm):
     def _make_spec_file(self):

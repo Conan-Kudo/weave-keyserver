@@ -46,7 +46,7 @@ from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
                        HTTPBadRequest, HTTPMethodNotAllowed,
                        HTTPMovedPermanently, HTTPPreconditionFailed)
 
-from services.cef import log_cef
+from cef import log_cef
 from services.util import convert_config, filter_params
 
 from keyexchange.util import (generate_cid, json_response, CID_CHARS,

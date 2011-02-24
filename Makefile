@@ -62,6 +62,7 @@ lint:
 build_rpms:
 	rm -rf $(CURDIR)/rpms
 	mkdir $(CURDIR)/rpms
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms cef
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms webob --version=1.0
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms paste --version=1.7.5.1
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms pastedeploy --version=1.3.4
