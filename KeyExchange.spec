@@ -1,8 +1,8 @@
 %define name python26-keyexchange
 %define pythonname KeyExchange
-%define version 0.2
-%define unmangled_version 0.2
-%define unmangled_version 0.2
+%define version 0.3
+%define unmangled_version 0.3
+%define unmangled_version 0.3
 %define release 1
 
 Summary: Key Exchange server
