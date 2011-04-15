@@ -464,8 +464,8 @@ class TestWsgiApp(unittest.TestCase):
         self.assertEqual(logs[0], 'somelog')
         self.assertEqual(logs[1], 'some\nmore')
 
-        # forbid empty reports
-        self.app.post('/report', status=400, extra_environ=self.env)
+        # if there's an empty report, we just ignore this
+        self.app.post('/report', status=200, extra_environ=self.env)
 
     def test_root(self):
         # the root must redirect to https://services.mozilla.com/

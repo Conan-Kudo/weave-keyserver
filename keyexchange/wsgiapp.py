@@ -326,12 +326,10 @@ class KeyExchangeApp(object):
         if body_log != '':
             log.append(body_log)
 
-        if len(log) == 0:
-            # log is empty
-            raise HTTPBadRequest()
-
-        log = '\n'.join(log)
-        log_cef('Report', 5, request.environ, self.config, msg=log)
+        # logging only if the log is not empty
+        if len(log) > 0:
+            log = '\n'.join(log)
+            log_cef('Report', 5, request.environ, self.config, msg=log)
 
         # removing the channel if present
         channel_id = request.headers.get('X-KeyExchange-Cid')
