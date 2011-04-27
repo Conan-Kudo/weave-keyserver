@@ -75,5 +75,5 @@ build_rpms:
 	cd deps/server-core; rm -rf build; ../../$(PYTHON) setup.py --command-packages=pypi2rpm.command bdist_rpm2 --spec-file=Services.spec --dist-dir=$(CURDIR)/rpms --binary-only
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms simplejson --version=2.1.1
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms routes --version=1.12.3
-	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms sqlalchemy --version=0.6.4
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms sqlalchemy --version=0.6.6
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms mysql-python --version=1.2.3
