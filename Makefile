@@ -77,3 +77,12 @@ build_rpms:
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms routes --version=1.12.3
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms sqlalchemy --version=0.6.6
 	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms mysql-python --version=1.2.3
+	$(PYPI2RPM) --dist-dir=$(CURDIR)/rpms wsgiproxy --version=0.2.2
+
+mach: build build_rpms
+	mach clean
+	mach yum install python26 python26-setuptools
+	cd rpms; wget http://mrepo/mrepo/5-x86_64/RPMS.mozilla-services/gunicorn-0.11.2-1moz.x86_64.rpm
+	cd rpms; wget http://mrepo/mrepo/5-x86_64/RPMS.mozilla/nginx-0.7.65-4.x86_64.rpm
+	mach yum install rpms/*
+	mach chroot python2.6 -m keyexchange.run
