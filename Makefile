@@ -10,6 +10,7 @@ COVERAGE = bin/coverage
 PYLINT = bin/pylint
 PKGS = keyexchange
 PYPI2RPM = bin/pypi2rpm.py
+BUILD = bin/buildapp
 
 .PHONY: all build test bench_one bench bend_report build_rpms hudson lint functest
 
@@ -17,7 +18,8 @@ all:	build
 
 build:
 	$(VIRTUALENV) --no-site-packages --distribute .
-	$(PYTHON) build.py $(APPNAME) $(DEPS)
+	$(EZ) -U MoPyTools
+	$(BUILD) $(APPNAME) $(DEPS)
 	$(EZ) nose
 	$(EZ) WebTest
 	$(EZ) Funkload
