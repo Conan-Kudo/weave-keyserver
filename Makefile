@@ -4,30 +4,52 @@ VIRTUALENV = virtualenv
 NOSE = bin/nosetests -s --with-xunit
 TESTS = keyexchange/tests
 PYTHON = bin/python
-EZ = bin/easy_install
 COVEROPTS = --cover-html --cover-html-dir=html --with-coverage --cover-package=keyexchange
 COVERAGE = bin/coverage
 PYLINT = bin/pylint
 PKGS = keyexchange
 PYPI2RPM = bin/pypi2rpm.py
 BUILD = bin/buildapp
+PYPI = http://pypi.python.org/simple
+PYPIOPTIONS = -i $(PYPI)
+EZ = bin/easy_install
+EZOPTIONS = -U -i $(PYPI)
+
+ifdef PYPIEXTRAS
+	PYPIOPTIONS += -e $(PYPIEXTRAS)
+	EZOPTIONS += -f $(PYPIEXTRAS)
+endif
+
+ifdef PYPISTRICT
+	PYPIOPTIONS += -s
+	ifdef PYPIEXTRAS
+		HOST = `python -c "import urlparse; print urlparse.urlparse('$(PYPI)')[1] + ',' + urlparse.urlparse('$(PYPIEXTRAS)')[1]"`
+
+	else
+		HOST = `python -c "import urlparse; print urlparse.urlparse('$(PYPI)')[1]"`
+	endif
+	EZOPTIONS += --allow-hosts=$(HOST)
+endif
+
+EZ += $(EZOPTIONS)
 
 .PHONY: all build test bench_one bench bend_report build_rpms hudson lint functest
 
 all:	build
 
 build:
+
 	$(VIRTUALENV) --no-site-packages --distribute .
-	$(EZ) -U MoPyTools
-	$(BUILD) $(APPNAME) $(DEPS)
+	$(EZ) MoPyTools
+	$(BUILD) $(PYPIOPTIONS) $(APPNAME) $(DEPS)
 	$(EZ) nose
 	$(EZ) WebTest
-	$(EZ) Funkload
+	$(EZ) funkload
 	$(EZ) pylint
 	$(EZ) coverage
 	$(EZ) pypi2rpm
 	$(EZ) wsgi_intercept
-	$(EZ) wsgiproxy
+	$(EZ) WSGIProxy
 
 test:
 	$(NOSE) $(TESTS)
