@@ -14,6 +14,16 @@ PYPI = http://pypi.python.org/simple
 PYPIOPTIONS = -i $(PYPI)
 EZ = bin/easy_install
 EZOPTIONS = -U -i $(PYPI)
+BENCH_CYCLE = 10
+BENCH_DURATION = 10
+BENCH_SCP =
+
+ifdef TEST_REMOTE
+	BENCHOPTIONS = --url $(TEST_REMOTE) --cycle $(BENCH_CYCLE) --duration $(BENCH_DURATION)
+else
+	BENCHOPTIONS = --cycle $(BENCH_CYCLE) --duration $(BENCH_DURATION)
+endif
+
 
 ifdef PYPIEXTRAS
 	PYPIOPTIONS += -e $(PYPIEXTRAS)
@@ -58,22 +68,11 @@ bench_one:
 	cd keyexchange/tests; ../../bin/fl-run-test keyexchange.tests.stress StressTest.test_channel_put_get
 
 bench:
-	cd keyexchange/tests; ../../bin/fl-run-bench stress StressTest.test_channel_put_get
-
-bench2_one:
-	bin/fl-run-test keyexchange.tests.stress StressTest.test_DoS -
-
-bench2:
-	cd keyexchange/tests; ../../bin/fl-run-bench stress StressTest.test_DoS
-
-bench3_one:
-	cd keyexchange/tests; ../../bin/fl-run-test keyexchange.tests.stress StressTest.test_full_protocol
-
-bench3:
-	cd keyexchange/tests; ../../bin/fl-run-bench stress StressTest.test_full_protocol
+	cd keyexchange/tests; ../../bin/fl-run-bench $(BENCHOPTIONS) stress StressTest.test_channel_put_get
+	$(BENCH_SCP)
 
 bench_report:
-	bin/fl-build-report --html -o html keyexchange/tests/stress-bench.xml
+	bin/fl-build-report --html -o html keyexchange/tests/keyexchange.xml
 
 hudson:
 	rm -f coverage.xml

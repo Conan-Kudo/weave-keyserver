@@ -43,7 +43,6 @@ import hashlib
 import threading
 import time
 
-from keyexchange.tests import _patch   # NOQA
 from keyexchange.tests.client import JPAKE
 
 from funkload.FunkLoadTestCase import FunkLoadTestCase
