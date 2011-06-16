@@ -8,9 +8,9 @@ COVEROPTS = --cover-html --cover-html-dir=html --with-coverage --cover-package=k
 COVERAGE = bin/coverage
 PYLINT = bin/pylint
 PKGS = keyexchange
-PYPI2RPM = bin/pypi2rpm.py
 BUILD = bin/buildapp
 PYPI = http://pypi.python.org/simple
+PYPI2RPM = bin/pypi2rpm.py --index=$(PYPI)
 PYPIOPTIONS = -i $(PYPI)
 EZ = bin/easy_install
 EZOPTIONS = -U -i $(PYPI)
