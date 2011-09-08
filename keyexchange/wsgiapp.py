@@ -352,7 +352,7 @@ class KeyExchangeApp(object):
 def make_app(global_conf, **app_conf):
     """Returns a Key Exchange Application."""
     global_conf.update(app_conf)
-    config = convert_config(global_conf)
+    config = Config(global_conf)
     app = KeyExchangeApp(config)
     blacklisted = app.blacklisted
 
@@ -381,6 +381,6 @@ def make_app(global_conf, **app_conf):
     if config.get('filtering.use', False):
         del config['filtering.use']
         app = IPFiltering(app, callback=blacklisted,
-                          **filter_params('filtering', config))
+                          **config.get_section('filtering')
 
     return app
