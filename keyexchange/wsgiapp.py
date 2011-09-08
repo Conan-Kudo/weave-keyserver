@@ -47,7 +47,7 @@ from webob.exc import (HTTPNotModified, HTTPNotFound, HTTPServiceUnavailable,
                        HTTPMovedPermanently, HTTPPreconditionFailed)
 
 from cef import log_cef
-from services.util import convert_config, filter_params
+from services.config import Config
 
 from keyexchange.util import (generate_cid, json_response, CID_CHARS,
                               PrefixedCache, get_memcache_class)
@@ -380,7 +380,7 @@ def make_app(global_conf, **app_conf):
     # IP Filtering middleware
     if config.get('filtering.use', False):
         del config['filtering.use']
-        app = IPFiltering(app, callback=blacklisted,
-                          **config.get_section('filtering')
+        params = config.get_section('filtering')
+        app = IPFiltering(app, callback=blacklisted, **params)
 
     return app
