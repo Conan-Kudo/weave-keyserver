@@ -12,5 +12,5 @@ Routes
 SQLAlchemy <= 0.6.99
 MySQL-python
 WSGIProxy
-metlog
+metlog-py
 metlog-cef
