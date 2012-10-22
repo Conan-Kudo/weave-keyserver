@@ -189,9 +189,21 @@ class TestIPFiltering(unittest.TestCase):
                 for i in range(10):
                     self.blacklist.add(self.name + str(i))
 
-                # remove a random element
+                # Remove a random element.
+                # It's possible that multiple threads pick the same
+                # element to remove, producing a KeyError.  Loop until
+                # one is successfully removed.
                 ips = list(self.blacklist.ips)
-                self.blacklist.remove(random.choice(ips))
+                for _ in xrange(1000):
+                    try:
+                        self.blacklist.remove(random.choice(ips))
+                        break
+                    except KeyError:
+                        pass
+                else:
+                    msg = "Repeated collisions while trying to remove an "\
+                          "element, something is almost certainly wrong."
+                    raise Exception(msg)
 
                 # save the list
                 self.blacklist.save()
