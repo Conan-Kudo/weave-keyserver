@@ -1,5 +1,6 @@
 cef
 WebOb == 1.0.7
+WebTest == 1.4.3
 Paste
 PasteDeploy
 PasteScript
