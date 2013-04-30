@@ -15,3 +15,4 @@ MySQL-python
 WSGIProxy
 metlog-py
 metlog-cef
+scrypt
