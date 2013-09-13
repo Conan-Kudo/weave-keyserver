@@ -57,14 +57,20 @@ all:	build
 
 build:
 	$(VIRTUALENV) --no-site-packages --distribute .
+	$(INSTALL) Distribute
 	$(INSTALL) MoPyTools
 	$(INSTALL) nose
 	$(INSTALL) WebTest
 	$(INSTALL) coverage
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
+	# Pre-compile mako templates into the correct directories.
+	for TMPL in `find . -name '*.mako'`; do ./bin/python -c "from mako.template import Template; Template(filename='$$TMPL', module_directory='`dirname $$TMPL`', uri='`basename $$TMPL`')"; done;
+
 
 update:
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
+	# Pre-compile mako templates into the correct directories.
+	for TMPL in `find . -name '*.mako'`; do ./bin/python -c "from mako.template import Template; Template(filename='$$TMPL', module_directory='`dirname $$TMPL`', uri='`basename $$TMPL`')"; done;
 
 test:
 	$(NOSE) $(TESTS)
