@@ -3,7 +3,7 @@
 %define version 0.4
 %define unmangled_version 0.4
 %define unmangled_version 0.4
-%define release 1
+%define release 3
 
 Summary: Key Exchange server
 Name: %{name}
