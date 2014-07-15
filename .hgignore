@@ -2,6 +2,9 @@ html
 lib
 bin
 include
+man
+.channel
 .*egg-info
 .*egg
 .*pyc
+.*mako\.py
