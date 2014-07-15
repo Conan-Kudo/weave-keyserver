@@ -3,6 +3,8 @@ lib
 bin
 include
 man
+dist
+build
 .channel
 .*egg-info
 .*egg
