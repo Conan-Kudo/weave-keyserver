@@ -10,6 +10,7 @@ PYLINT = bin/pylint
 PKGS = keyexchange
 BUILDAPP = bin/buildapp
 BUILDRPMS = bin/buildrpms
+BUILD_TMP = /tmp/server-key-exhange-build.${USER}
 PYPI = http://pypi.python.org/simple
 PYPI2RPM = bin/pypi2rpm.py --index=$(PYPI)
 PYPIOPTIONS = -i $(PYPI)
@@ -63,6 +64,12 @@ build:
 	$(INSTALL) WebTest
 	$(INSTALL) coverage
 	$(BUILDAPP) -c $(CHANNEL) $(PYPIOPTIONS) $(DEPS)
+	# py-scrypt doesn't play nicely with pypi2rpm
+	# so we can't list it in the requirements files.
+	mkdir -p ${BUILD_TMP}
+	cd ${BUILD_TMP}; tar -xzvf $(CURDIR)/upstream-deps/py-scrypt-0.6.0.tar.gz
+	$(INSTALL) ${BUILD_TMP}
+	rm -rf ${BUILD_TMP}
 	# Pre-compile mako templates into the correct directories.
 	for TMPL in `find . -name '*.mako'`; do ./bin/python -c "from mako.template import Template; Template(filename='$$TMPL', module_directory='`dirname $$TMPL`', uri='`basename $$TMPL`')"; done;
 
@@ -94,7 +101,12 @@ lint:
 	- $(PYLINT) -f parseable --rcfile=pylintrc $(PKGS) > pylint.txt
 
 build_rpms:
-	$(BUILDRPMS) -c $(RPM_CHANNEL) $(DEPS)
+	rm -rf rpms
+	mkdir -p ${BUILD_TMP}
+	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
+	# py-scrypt doesn't play nicely with pypi2rpm.
+	cd ${BUILD_TMP}; tar -xzvf $(CURDIR)/upstream-deps/py-scrypt-0.6.0.tar.gz
+	cd ${BUILD_TMP}; python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-scrypt --dist-dir=$(CURDIR)/rpms
 
 mach: build build_rpms
 	mach clean
