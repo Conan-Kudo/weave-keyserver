@@ -16,3 +16,4 @@ WSGIProxy
 metlog-py
 metlog-cef
 scrypt
+setuptools
