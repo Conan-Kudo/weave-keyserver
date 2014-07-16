@@ -15,5 +15,7 @@ MySQL-python == 1.2.3
 WSGIProxy == 0.2.2
 metlog-py == 0.9.8
 metlog-cef == 0.2
-scrypt == 0.6.1
 setuptools == 5.4.1
+# The scrypt package doesn't play nice with pypi2rpm
+# so we install it manually in the makefile.
+# scrypt == 0.6.1

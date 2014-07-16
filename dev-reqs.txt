@@ -15,5 +15,7 @@ MySQL-python
 WSGIProxy
 metlog-py
 metlog-cef
-scrypt
 setuptools
+# The scrypt package doesn't play nice with pypi2rpm
+# so we install it manually in the makefile.
+# scrypt
