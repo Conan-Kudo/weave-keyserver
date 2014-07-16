@@ -106,7 +106,7 @@ build_rpms:
 	$(BUILDRPMS) -c $(RPM_CHANNEL) $(PYPIOPTIONS) $(DEPS)
 	# py-scrypt doesn't play nicely with pypi2rpm.
 	cd ${BUILD_TMP}; tar -xzvf $(CURDIR)/upstream-deps/py-scrypt-0.6.0.tar.gz
-	cd ${BUILD_TMP}; ./bin/python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-scrypt --dist-dir=$(CURDIR)/rpms
+	cd ${BUILD_TMP}; $(CURDIR)/bin/python setup.py  --command-packages=pypi2rpm.command bdist_rpm2 --binary-only --name=python26-scrypt --dist-dir=$(CURDIR)/rpms
 
 mach: build build_rpms
 	mach clean
